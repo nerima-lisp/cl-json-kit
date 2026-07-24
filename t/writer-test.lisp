@@ -51,10 +51,38 @@
       (expect input :to-stringify-as "\"a\\\"b\\\\c\\nd\\te\""))
     (expect (string (code-char #x01)) :to-stringify-as "\"\\u0001\""))
 
+  (it "escapes correctly across plain-run boundaries"
+    ;; Escapes at the start, end, and interior of a plain run must all survive
+    ;; the run-flushing encode path unchanged.
+    (dolist (case (list (cons "plain" "\"plain\"")
+                        (cons "\"plain" "\"\\\"plain\"")
+                        (cons "plain\"" "\"plain\\\"\"")
+                        (cons "a\"b\\c" "\"a\\\"b\\\\c\"")
+                        (cons (concatenate 'string "ab" (string #\Newline) "cd"
+                                           (string #\Tab) "ef")
+                              "\"ab\\ncd\\tef\"")))
+      (expect (string= (stringify (car case)) (cdr case)) :to-be-truthy)))
+
+  (it "truncates escaped output at exact character boundaries"
+    ;; ab"cd escapes to "ab\"cd" (8 characters); each budget must stop the
+    ;; stream at the same byte the char-accurate writer would.
+    (let ((input "ab\"cd"))
+      (expect (string= (stringify input :max-output-length 8) "\"ab\\\"cd\"") :to-be-truthy)
+      (signals json-serialization-error (stringify input :max-output-length 7))
+      (dolist (case (list (cons 4 "\"ab")
+                          (cons 5 "\"ab\\\"")
+                          (cons 7 "\"ab\\\"cd")))
+        (let ((stream (make-string-output-stream)))
+          (handler-case (write-json input stream :max-output-length (car case))
+            (json-serialization-error ()))
+          (expect (string= (get-output-stream-string stream) (cdr case)) :to-be-truthy)))))
+
   (it "rejects raw surrogate characters"
     (let ((surrogate (code-char #xd800)))
       (when surrogate
-        (signals json-serialization-error (stringify (string surrogate)))))))
+        (signals json-serialization-error (stringify (string surrogate)))
+        (signals json-serialization-error
+          (stringify (concatenate 'string "plain" (string surrogate) "tail")))))))
 
 (describe "pretty printing and key ordering"
   (it "indents nested output when :PRETTY"

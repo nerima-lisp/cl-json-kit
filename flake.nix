@@ -98,10 +98,21 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
+          # SBCL with the competitor JSON libraries preloaded, so
+          # benchmark/competitors.lisp can compare cl-json-kit against them
+          # under `nix develop` (see benchmark/README.md).
+          benchmarkSbcl = pkgs.sbcl.withPackages (
+            ps: [
+              ps.jzon
+              ps.jonathan
+              ps.jsown
+              ps.yason
+            ]
+          );
         in
         {
           default = pkgs.mkShell {
-            packages = [ pkgs.sbcl ];
+            packages = [ benchmarkSbcl ];
             CL_SOURCE_REGISTRY = sourceRegistry;
           };
         }

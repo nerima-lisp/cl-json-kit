@@ -70,9 +70,11 @@ result; with no decoder the key is returned unchanged."
   "Add CONVERTED-KEY/VALUE to the accumulating object under the current
 DUPLICATE-KEY-POLICY, updating the SEEN table, and return the (possibly new)
 RESULT accumulator.  For :HASH-TABLE, RESULT is the table itself; for :ALIST it
-is the reversed member list being consed."
+is the reversed member list being consed.  SEEN is NIL on the fast path (a
+HASH-TABLE object under :LAST needs no duplicate tracking); REMEMBER then does
+nothing, since a repeat key simply overwrites the table entry."
   (flet ((alist-p () (eq (ps-object-type state) :alist))
-         (remember (key cell) (setf (gethash key seen) cell)))
+         (remember (key cell) (when seen (setf (gethash key seen) cell))))
     (ecase (ps-duplicate-key-policy state)
       (:preserve (cons (cons converted-key value) result))
       (:first
@@ -107,7 +109,8 @@ new) RESULT accumulator, exactly as RECORD-OBJECT-MEMBER does."
   (let* ((key (parse-json-string state))
          (converted-key (with-parser-path (state key)
                           (json-key->lisp-key key state))))
-    (multiple-value-bind (prior present-p) (gethash converted-key seen)
+    (multiple-value-bind (prior present-p)
+        (if seen (gethash converted-key seen) (values nil nil))
       (when (and present-p (eq (ps-duplicate-key-policy state) :error))
         (with-parser-path (state key)
           (parse-error-here state "unique object key")))
@@ -122,10 +125,15 @@ new) RESULT accumulator, exactly as RECORD-OBJECT-MEMBER does."
   (with-nesting-guard (state)
     (expect-char state #\{)
     (skip-whitespace state)
-    (let ((result (when (eq (ps-object-type state) :hash-table)
-                    (make-hash-table :test #'equal)))
-          (seen (make-hash-table :test #'equal))
-          (count 0))
+    ;; Fast path: a HASH-TABLE object under :LAST just overwrites on a repeat
+    ;; key, so it needs no separate SEEN table -- saving that allocation and a
+    ;; gethash/sethash per member, which dominates parsing a large object.
+    (let* ((fast-last-p (and (eq (ps-object-type state) :hash-table)
+                             (eq (ps-duplicate-key-policy state) :last)))
+           (result (when (eq (ps-object-type state) :hash-table)
+                     (make-hash-table :test #'equal)))
+           (seen (unless fast-last-p (make-hash-table :test #'equal)))
+           (count 0))
       (unless (eql (ps-peek state) #\})
         (loop
           (when (>= count (ps-max-object-members state))
@@ -155,20 +163,34 @@ new) RESULT accumulator, exactly as RECORD-OBJECT-MEMBER does."
       (skip-whitespace state)
       (let ((elements (when vector-p
                         (make-array 0 :adjustable t :fill-pointer 0)))
-            (count 0))
+            (count 0)
+            (saved-path (ps-path state))
+            ;; One reused cons instead of WITH-PARSER-PATH's fresh cons per
+            ;; element: the error path only ever reads (PS-PATH STATE)
+            ;; synchronously and PARSE-ERROR-HERE copies it, so mutating this
+            ;; frame's index between elements is safe and saves an allocation
+            ;; per element -- the difference between O(n) and zero path conses
+            ;; for a million-element array.
+            (path-frame nil))
         (unless (eql (ps-peek state) #\])
-          (loop
-            (when (>= count (ps-max-array-elements state))
-              (parse-error-here state "fewer array elements"))
-            (skip-whitespace state)
-            (let ((value (with-parser-path (state count) (parse-value state))))
-              (if vector-p
-                  (vector-push-extend value elements)
-                  (push value elements)))
-            (incf count)
-            (consume-separator-or-finish
-                (state #\] "array value" "comma or closing bracket")
-              (return))))
+          (setf path-frame (cons 0 saved-path))
+          (unwind-protect
+               (loop
+                 (when (>= count (ps-max-array-elements state))
+                   (parse-error-here state "fewer array elements"))
+                 (skip-whitespace state)
+                 (setf (car path-frame) count
+                       (ps-path state) path-frame)
+                 (let ((value (parse-value state)))
+                   (setf (ps-path state) saved-path)
+                   (if vector-p
+                       (vector-push-extend value elements)
+                       (push value elements)))
+                 (incf count)
+                 (consume-separator-or-finish
+                     (state #\] "array value" "comma or closing bracket")
+                   (return)))
+            (setf (ps-path state) saved-path)))
         (expect-char state #\])
         (let ((array (if vector-p
                          (coerce elements 'simple-vector)

@@ -68,8 +68,15 @@ configured maximum is exceeded."
   (incf *json-output-count* length))
 
 (defun emit-string (string)
-  (reserve-output (length string))
-  (write-string string *json-output-stream*))
+  (let ((length (length string)))
+    (reserve-output length)
+    ;; For the very short strings the writer emits most often (two-character
+    ;; escapes, small number tokens) a WRITE-CHAR loop beats the per-call
+    ;; overhead of WRITE-STRING.
+    (if (<= length 4)
+        (loop for character across string
+              do (write-char character *json-output-stream*))
+        (write-string string *json-output-stream*))))
 
 (defun emit-character (character)
   (reserve-output 1)

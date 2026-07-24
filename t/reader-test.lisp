@@ -99,7 +99,24 @@
           (expected (coerce (list #\Backspace #\Page #\Newline #\Return #\Tab
                                   #\" #\\ #\/)
                             'string)))
-      (expect decoded :to-equal expected))))
+      (expect decoded :to-equal expected)))
+
+  (it "bounds decoded escaped-string length exactly and combines escapes beyond the BMP"
+    ;; The JSON unit a\"b\\cA decodes to the six characters a"b\cA; repeating
+    ;; it drives the escaped slow path over a long, mixed-escape string.
+    (let* ((unit "a\\\"b\\\\c\\u0041")
+           (encoded (format nil "\"~{~A~}\"" (make-list 128 :initial-element unit)))
+           (expected (format nil "~{~A~}" (make-list 128 :initial-element "a\"b\\cA"))))
+      (expect (string= (parse encoded :max-string-length (length expected)) expected)
+              :to-be-truthy)
+      (signals json-parse-error (parse encoded :max-string-length (1- (length expected)))))
+    (expect (string= (parse "\"\\uD83D\\uDE00\\\"\\\\\"")
+                     (format nil "~C\"\\" (code-char #x1F600)))
+            :to-be-truthy)
+    (let* ((tail (make-string 10000 :initial-element #\a))
+           (value (parse (format nil "[\"\\\"\",\"~A\"]" tail))))
+      (expect (string= (aref value 0) "\"") :to-be-truthy)
+      (expect (string= (aref value 1) tail) :to-be-truthy))))
 
 (describe "collections and duplicate keys"
   (it "selects representation from :OBJECT-TYPE and :ARRAY-TYPE"
@@ -175,10 +192,107 @@
     (expect (parse "{\"a\":1,\"b\":2}" :object-type :alist :duplicate-key-policy :last)
             :to-equal (list (cons "a" 1) (cons "b" 2))))
 
+  (it "keeps present-vs-absent distinct for NIL values and still decodes dropped duplicates"
+    ;; With :NULL-VALUE NIL, presence must be tracked independently of the value,
+    ;; and a dropped duplicate's value is still decoded before being discarded.
+    (let ((first (parse "{\"a\":null,\"a\":1}" :null-value nil :duplicate-key-policy :first))
+          (last (parse "{\"a\":null,\"a\":1}" :null-value nil :duplicate-key-policy :last)))
+      (multiple-value-bind (value present-p) (gethash "a" first)
+        (expect (null value) :to-be-truthy)
+        (expect present-p :to-be-truthy))
+      (expect (= (gethash "a" last) 1) :to-be-truthy))
+    (expect (parse "{\"a\":null,\"a\":1}" :null-value nil
+                                          :object-type :alist :duplicate-key-policy :first)
+            :to-equal (list (cons "a" nil)))
+    (expect (parse "{\"a\":null,\"a\":1}" :null-value nil
+                                          :object-type :alist :duplicate-key-policy :last)
+            :to-equal (list (cons "a" 1)))
+    (let ((calls 0))
+      (let ((object (parse "{\"a\":1,\"A\":2}"
+                           :key-decoder #'string-downcase
+                           :duplicate-key-policy :first
+                           :number-decoder (lambda (token integer-p)
+                                             (declare (ignore integer-p))
+                                             (incf calls)
+                                             (parse-integer token)))))
+        (expect (= calls 2) :to-be-truthy)
+        (expect (= (gethash "a" object) 1) :to-be-truthy))))
+
   (it-each (("{\"a\":1,}") ("{\"a\":1 2}") ("[1,]") ("[1 2]") ("{\"a\":{}}"))
       "rejects the malformed structure ~S"
       (text)
     (signals json-parse-error (parse text :max-depth 1))))
+
+(describe "large objects"
+  ;; A four-thousand-member object exercises the object accumulator well past
+  ;; any incremental-growth boundary, confirming the result, the resource
+  ;; bounds, and the callback firing order are all independent of object size.
+  (it "parses a large object across trailing suffixes and enforces its bounds"
+    (let* ((member-count 4096)
+           (object-text
+             (with-output-to-string (stream)
+               (write-char #\{ stream)
+               (dotimes (index member-count)
+                 (unless (zerop index) (write-char #\, stream))
+                 (format stream "\"k~D\":~D" index index))
+               (write-char #\} stream))))
+      ;; Final contents are correct regardless of trailing whitespace.
+      (dolist (suffix (list "" " " (string #\Tab) (string #\Newline) (string #\Return)
+                            (format nil "~C~C~C~C" #\Space #\Tab #\Newline #\Return)
+                            (make-string (* 1024 1024) :initial-element #\Space)))
+        (let ((value (parse (concatenate 'string object-text suffix))))
+          (expect (= (hash-table-count value) member-count) :to-be-truthy)
+          (expect (= (gethash "k0" value) 0) :to-be-truthy)
+          (expect (= (gethash "k4095" value) 4095) :to-be-truthy)))
+      ;; A non-whitespace suffix is trailing data at exactly the object's end.
+      (let ((condition (capture-json-parse-error (parse (concatenate 'string object-text "x")))))
+        (expect (= (json-parse-error-position condition) (length object-text)) :to-be-truthy)
+        (expect (json-parse-error-path condition) :to-be-falsy)
+        (expect (string= (json-parse-error-expected condition) "end of input") :to-be-truthy))
+      ;; The member bound still fires on the large object.
+      (let ((condition (capture-json-parse-error
+                        (parse object-text :max-object-members (1- member-count)))))
+        (expect (json-parse-error-path condition) :to-be-falsy)
+        (expect (string= (json-parse-error-expected condition) "fewer object members")
+                :to-be-truthy))
+      ;; Key/number decoders and the object hook each fire once per member, in order.
+      (let ((key-count 0) (number-count 0) (trace nil))
+        (let ((value (parse object-text
+                            :key-decoder (lambda (key)
+                                           (incf key-count)
+                                           (when (or (= key-count 1) (= key-count member-count))
+                                             (push (list :key key-count key) trace))
+                                           key)
+                            :number-decoder (lambda (token integer-p)
+                                              (incf number-count)
+                                              (when (or (= number-count 1)
+                                                        (= number-count member-count))
+                                                (push (list :number number-count token integer-p)
+                                                      trace))
+                                              (parse-integer token))
+                            :object-hook (lambda (object)
+                                           (push (list :object (hash-table-count object)
+                                                       (gethash "k4095" object))
+                                                 trace)
+                                           object))))
+          (expect (= key-count member-count) :to-be-truthy)
+          (expect (= number-count member-count) :to-be-truthy)
+          (expect (nreverse trace)
+                  :to-equal (list (list :key 1 "k0")
+                                  (list :number 1 "0" t)
+                                  (list :key member-count "k4095")
+                                  (list :number member-count "4095" t)
+                                  (list :object member-count 4095)))
+          (expect (= (hash-table-count value) member-count) :to-be-truthy)))
+      ;; A throwing object hook is reported at the object's end, with no path.
+      (let ((condition (capture-json-parse-error
+                        (parse object-text
+                               :object-hook (lambda (object)
+                                              (declare (ignore object))
+                                              (error "boundary hook"))))))
+        (expect (= (json-parse-error-position condition) (length object-text)) :to-be-truthy)
+        (expect (json-parse-error-path condition) :to-be-falsy)
+        (expect (search "OBJECT-HOOK" (json-parse-error-expected condition)) :to-be-truthy)))))
 
 (describe "resource bounds and truncation"
   (it "honours element, depth, string, and number limits"
@@ -239,7 +353,40 @@
     (let ((tab-condition (capture-json-parse-error (parse (format nil "~C]" #\Tab))))
           (backspace-condition (capture-json-parse-error (parse (format nil "~C@" (code-char 8))))))
       (expect (search "\\t" (json-parse-error-text tab-condition)) :to-be-truthy)
-      (expect (search "\\b" (json-parse-error-text backspace-condition)) :to-be-truthy))))
+      (expect (search "\\b" (json-parse-error-text backspace-condition)) :to-be-truthy)))
+
+  (it "positions the error at the overrun when MAX-STRING-LENGTH is exceeded by an escape"
+    (let ((condition (capture-json-parse-error (parse "\"\\u0041\"" :max-string-length 0))))
+      (expect (= (json-parse-error-position condition) 7) :to-be-truthy)
+      (expect (= (json-parse-error-line condition) 1) :to-be-truthy)
+      (expect (= (json-parse-error-column condition) 8) :to-be-truthy)))
+
+  (it "tracks the structured path only while parsing the offending member value"
+    (dolist (case (list (list "{\"a\":[{\"b\":[0,?]}]}" (list "a" 0 "b" 1))
+                        (list "[[0],[1,?]]" (list 1 1))
+                        (list "[[0],?]" (list 1))
+                        (list "{\"outer\":{\"bad\\q\":1}}" (list "outer"))
+                        (list "{\"outer\":{\"bad\" 1}}" (list "outer"))
+                        (list "{\"outer\":[0,]}" (list "outer"))
+                        (list "{\"outer\":[0 x]}" (list "outer"))))
+      (destructuring-bind (text expected-path) case
+        (let ((condition (capture-json-parse-error (parse text))))
+          (expect (json-parse-error-path condition) :to-equal expected-path)))))
+
+  (it "reports exact coordinates and diagnostics for array-position errors"
+    (dolist (case (list (list (format nil "[0,~% ?]") nil 5 2 2 (list 1) "JSON value")
+                        (list "{\"outer\":[0,]}" nil 12 1 13 (list "outer") "array value")
+                        (list "[1,2]" (list :max-array-elements 1) 3 1 4 nil "fewer array elements")))
+      (destructuring-bind (text options position line column path diagnostic) case
+        (let ((condition (capture-json-parse-error
+                          (apply #'parse text (list* :context "array-regression" options)))))
+          (expect (= (json-parse-error-position condition) position) :to-be-truthy)
+          (expect (= (json-parse-error-line condition) line) :to-be-truthy)
+          (expect (= (json-parse-error-column condition) column) :to-be-truthy)
+          (expect (json-parse-error-path condition) :to-equal path)
+          (expect (string= (json-parse-error-expected condition) diagnostic) :to-be-truthy)
+          (expect (string= (json-parse-error-context condition) "array-regression")
+                  :to-be-truthy))))))
 
 (describe "user callbacks"
   (it "applies key and number decoders"
@@ -289,7 +436,18 @@
             :to-be-truthy)
     (expect (parse "2" :number-decoder 'symbol-number-decoder) :to-equal "number:2")
     (expect (= (parse "{\"a\":1}" :object-hook 'hash-table-count) 1) :to-be-truthy)
-    (expect (parse "[1,2]" :array-hook 'reverse) :to-equalp #(2 1))))
+    (expect (parse "[1,2]" :array-hook 'reverse) :to-equalp #(2 1)))
+
+  (it "blames the deep path when a number decoder throws inside a nested array"
+    (let ((condition
+            (capture-json-parse-error
+             (parse "[[0],[1,2]]"
+                    :number-decoder (lambda (token integer-p)
+                                      (declare (ignore integer-p))
+                                      (when (string= token "2") (error "nested number boom"))
+                                      (parse-integer token))))))
+      (expect (json-parse-error-path condition) :to-equal (list 1 1))
+      (expect (search "nested number boom" (json-parse-error-expected condition)) :to-be-truthy))))
 
 (describe "stream framing with read-json"
   (it "reads exactly one value at a time, honouring strings and nesting"
