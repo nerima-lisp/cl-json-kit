@@ -409,6 +409,28 @@ or:
 nix flake check
 ```
 
+## Benchmarks
+
+The `benchmark/` directory holds two reproducible SBCL harnesses. `run.lisp`
+measures the library's own string and stream reader/writer APIs; `competitors.lisp`
+compares its string DOM APIs against Jzon, Jonathan, JSOWN, and Yason. Both emit
+human-readable progress to standard error and machine-readable TSV, with full
+provenance (host, SBCL, pinned sources, and execution order) embedded in the
+output. The default `nix develop` shell provides the competitor libraries:
+
+```sh
+# The library's own reader/writer throughput:
+sbcl --noinform --disable-debugger --script benchmark/run.lisp > results.tsv
+
+# Comparison against the other libraries:
+nix develop --command sbcl --noinform --disable-debugger \
+  --script benchmark/competitors.lisp > competitor-results.tsv
+```
+
+These measurements are scoped to the recorded corpus, settings, SBCL version,
+and host; see `benchmark/README.md` for the environment variables, the TSV
+schema, and the correctness gates each harness runs before timing.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
