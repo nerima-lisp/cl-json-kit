@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-07-24
+
+No public API or observable behavior changed in this release; it is an
+internal modernization and performance pass over the 0.1.0 surface.
+
+### Added
+
+- Reproducible SBCL benchmark harness under `benchmark/`: `run.lisp` measures
+  the library's own string and stream reader/writer APIs, and
+  `competitors.lisp` compares its string DOM APIs against Jzon, Jonathan,
+  JSOWN, and Yason. Both emit machine-readable TSV with full provenance (host,
+  SBCL, pinned sources, execution order). The default `nix develop` shell now
+  provides the competitor libraries. See `benchmark/README.md`.
+
+### Changed
+
+- Reworked the internals for 2026 Common Lisp idioms: the monolithic
+  `reader.lisp`/`writer.lisp` are split into per-concern files, shared types
+  and constants moved to `src/data.lisp`, and cross-cutting control flow was
+  consolidated into `src/reader-macros.lisp` / `src/writer-macros.lisp`.
+- Faster hot paths, all behavior-preserving: plain integers are parsed without
+  allocating a token string (fixnum accumulation with a bignum fallback); the
+  default hash-table/`:last` object path skips its duplicate-tracking table;
+  array parsing reuses one error-path cons per array instead of one per
+  element; `\uXXXX` escapes decode with direct fixnum arithmetic; and string
+  serialization flushes contiguous unescaped runs with a single write.
+- Bumped the `cl-weave` test dependency to v0.10.0 and adopted property-based
+  fuzzing of `parse`.
+- Hardened CI with a wall-clock `timeout` around the test run and a per-test
+  timeout budget.
+
 ## [0.1.0] - 2026-07-24
 
 ### Added
