@@ -16,10 +16,20 @@ correctly, and parsing can be bounded with a timeout."
   :pathname "src"
   :serial t
   :components ((:file "package")
-    (:file "conditions")
-    (:file "reader")
-    (:file "writer")
-    (:file "conversion"))
+               (:file "data")
+               (:file "macros")
+               (:file "conditions")
+               (:file "parser-state")
+               (:file "reader-strings")
+               (:file "reader-numbers")
+               (:file "reader-collections")
+               (:file "reader")
+               (:file "reader-stream")
+               (:file "writer-state")
+               (:file "writer-scalars")
+               (:file "writer-collections")
+               (:file "writer")
+               (:file "conversion"))
   :in-order-to ((test-op (test-op "cl-json-kit/test"))))
 
 (asdf:defsystem "cl-json-kit/test"
@@ -34,5 +44,9 @@ correctly, and parsing can be bounded with a timeout."
   :depends-on ("cl-json-kit" "cl-weave")
   :pathname "t"
   :serial t
-  :components ((:file "package") (:file "reader-test") (:file "writer-test"))
+  :components ((:file "package")
+               (:file "matchers")
+               (:file "reader-test")
+               (:file "writer-test")
+               (:file "property-test"))
   :perform (test-op (operation component) (declare (ignore operation component)) (unless (funcall (symbol-function (find-symbol "RUN-TESTS" "CL-JSON-KIT/TEST"))) (error "cl-json-kit test suite failed"))))

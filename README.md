@@ -118,7 +118,6 @@ unsupported Lisp values signal `json-serialization-error`.
   &key
     (object-type :hash-table)
     (array-type :vector)
-    (key-type :string)
     (duplicate-key-policy :last)
     (null-value json-kit:+json-null+)
     (false-value json-kit:+json-false+)
@@ -148,8 +147,7 @@ returns two values: the decoded value and the exclusive end index. Leading JSON
 whitespace is accepted; whitespace and other data after the value remain
 unconsumed:
 
-Use `:index` for new code. A positional index remains supported for
-compatibility, but specifying both forms is an error.
+Pass `:index` to start parsing at a later position; it defaults to zero.
 
 ```lisp
 (multiple-value-list (json-kit:parse-prefix "  [1,2] next"))
@@ -157,9 +155,8 @@ compatibility, but specifying both forms is an error.
 ```
 
 `object-type` is `:hash-table` or `:alist`; `array-type` is `:vector` or
-`:list`. `key-type` currently accepts only `:string` and exists as an explicit
-compatibility check. Use `key-decoder` to transform a decoded string key
-without interning attacker-controlled symbols:
+`:list`. Object keys are always strings; use `key-decoder` to transform a
+decoded string key without interning attacker-controlled symbols:
 
 ```lisp
 (json-kit:parse "{\"x-id\":17}"
@@ -225,7 +222,7 @@ octet/UTF-8 API.
     (indent 2)
     (max-depth 512)
     (max-elements 1000000)
-    (max-output-chars 16777216)
+    (max-output-length 16777216)
     (sort-keys nil)
     (null-value json-kit:+json-null+)
     (false-value json-kit:+json-false+)
@@ -233,9 +230,9 @@ octet/UTF-8 API.
 ```
 
 `write-json` writes characters to an existing stream, leaves it open, and
-returns the original value. `stringify` is the string-returning wrapper; its
-`max-output-length` is the same character-count limit as `write-json`'s
-`max-output-chars`. Stream output is incremental rather than transactional:
+returns the original value. `stringify` is the string-returning wrapper; both
+share the `max-output-length` character-count limit. Stream output is
+incremental rather than transactional:
 if serialization signals an error, an already-written prefix can remain in
 the stream.
 
@@ -399,27 +396,6 @@ characters; it does not promise ASCII-only output. RFC 8785 canonicalization,
 multiple-value stream framing, comments, trailing commas, JSON5 extensions,
 and arbitrary-precision decimal preservation without a custom
 `number-decoder`/`number-encoder` are non-goals.
-
-## Migration notes
-
-For callers of the earlier two-function API:
-
-- Parsed object keys now default to strings. Keyword-key decoding was removed
-  to prevent unbounded package symbol interning; use `key-decoder` only when
-  the key vocabulary is controlled.
-- JSON `null` and `false` now default to opaque `+json-null+` and
-  `+json-false+` sentinels. Use the predicates instead of comparing with
-  legacy keyword markers. The writer still accepts `:null` and `:false` for
-  compatibility, but new code should pass the opaque sentinels.
-- Duplicate keys now signal by default. Select `:first`, `:last`, or
-  `:preserve` explicitly when the protocol requires another policy.
-- `read-json` and `write-json` add character-stream entry points. `parse` and
-  `stringify` remain the string APIs.
-- Writer ordering remains unspecified unless `:sort-keys t` is requested.
-
-These mapping changes can alter application-visible values even when the JSON
-text itself is unchanged; audit key lookup and `null`/`false` comparisons
-before upgrading.
 
 ## Testing
 

@@ -5,7 +5,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     cl-weave = {
-      url = "github:nerima-lisp/cl-weave/v0.8.0";
+      url = "github:nerima-lisp/cl-weave/v0.9.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
