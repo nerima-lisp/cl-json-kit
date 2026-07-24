@@ -43,7 +43,7 @@ MAX-ELEMENTS in one bounded, cycle-safe traversal, and return its element count.
 JSON-OBJECT under :PRESERVE, otherwise a HASH-TABLE resolving duplicate keys by
 :ERROR, :FIRST, or :LAST."
   (check-type alist list)
-  (unless (member duplicate-key-policy '(:error :first :last :preserve))
+  (unless (member duplicate-key-policy +duplicate-key-policies+)
     (serialization-error "Unknown duplicate key policy ~A"
                          (safe-diagnostic-snippet duplicate-key-policy)))
   (if (eq duplicate-key-policy :preserve)

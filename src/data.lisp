@@ -66,3 +66,17 @@
       (#\Return    . #\r)
       (#\Tab       . #\t))
     "Alist mapping an unescaped character to its JSON escape letter."))
+
+;;; ---------------------------------------------------------------------
+;;; Number-grammar character vocabularies
+;;; ---------------------------------------------------------------------
+;;; RFC 8259's number grammar has exactly one sign alphabet and one exponent
+;;; marker alphabet, each read in more than one place (scanning a number's
+;;; grammar, decoding its exponent, and framing one number out of a live
+;;; character stream); naming them here means every site tests against the
+;;; same two characters instead of repeating the literal.
+(defparameter +json-sign-characters+ '(#\+ #\-)
+  "The two characters that may prefix a JSON number's exponent.")
+
+(defparameter +json-exponent-markers+ '(#\e #\E)
+  "The two characters that introduce a JSON number's exponent.")

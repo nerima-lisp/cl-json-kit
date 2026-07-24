@@ -96,6 +96,17 @@ used to reject oversized output before the full conversion is done."
 (defun ratio-scale-lower-bound (denominator)
   (floor (1- (integer-length denominator)) 3))
 
+(defun decimal-point-inserted-string (digits scale sign)
+  "SIGN concatenated with DIGITS, its decimal point moved SCALE places in from
+the right -- padding with leading zeros after \"0.\" when DIGITS is shorter
+than SCALE."
+  (if (zerop scale)
+      (concatenate 'string sign digits)
+      (let ((split (- (length digits) scale)))
+        (if (plusp split)
+            (concatenate 'string sign (subseq digits 0 split) "." (subseq digits split))
+            (concatenate 'string sign "0." (make-string (- split) :initial-element #\0) digits)))))
+
 (defun terminating-ratio-string (value)
   "A finite decimal string for the ratio VALUE, signalling if its expansion
 does not terminate or would exceed the output budget."
@@ -124,15 +135,7 @@ does not terminate or would exceed the output budget."
                           (expt 5 (- scale fives))))
                (digits (write-to-string scaled :base 10 :radix nil))
                (sign (if negative "-" "")))
-          (if (zerop scale)
-              (concatenate 'string sign digits)
-              (let ((split (- (length digits) scale)))
-                (if (plusp split)
-                    (concatenate 'string sign (subseq digits 0 split) "."
-                                 (subseq digits split))
-                    (concatenate 'string sign "0."
-                                 (make-string (- split) :initial-element #\0)
-                                 digits)))))))))
+          (decimal-point-inserted-string digits scale sign))))))
 
 (defun write-json-number (value)
   "Serialize VALUE as a JSON number, via a user NUMBER-ENCODER when present

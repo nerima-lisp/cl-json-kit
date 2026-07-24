@@ -39,11 +39,15 @@
 
   (it "represents large and small magnitudes exactly within MAX-EXACT-EXPONENT"
     (let ((large (parse "1e400" :max-exact-exponent 400))
-          (small (parse "1e-400" :max-exact-exponent 400)))
+          (small (parse "1e-400" :max-exact-exponent 400))
+          (negative-large (parse "-1e400" :max-exact-exponent 400))
+          (negative-small (parse "-1e-400" :max-exact-exponent 400)))
       (expect (integerp large) :to-be-truthy)
       (expect (= large (expt 10 400)) :to-be-truthy)
       (expect (rationalp small) :to-be-truthy)
-      (expect (= small (/ 1 (expt 10 400))) :to-be-truthy)))
+      (expect (= small (/ 1 (expt 10 400))) :to-be-truthy)
+      (expect (= negative-large (- (expt 10 400))) :to-be-truthy)
+      (expect (= negative-small (- (/ 1 (expt 10 400)))) :to-be-truthy)))
 
   (it-each (("1e401" 400) ("1e-401" 400) ("1e1000000000" 10000)
             ("1e-1000000000" 10000))

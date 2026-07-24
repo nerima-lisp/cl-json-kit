@@ -1,18 +1,18 @@
-;;;; src/macros.lisp
+;;;; src/reader-macros.lisp
 ;;;;
-;;;; Every cross-cutting control-flow shape in the library is named once here
-;;;; as a macro, so the logic files read as intent ("with this path pushed",
-;;;; "invoke this callback then continue", "walk this proper list") rather than
-;;;; as repeated let/unwind-protect/tortoise-and-hare bookkeeping.
+;;;; The reader's cross-cutting control-flow, named once here as a macro so
+;;;; the reader-* logic files read as intent ("with this path pushed", "invoke
+;;;; this callback then continue") rather than repeated let/unwind-protect
+;;;; bookkeeping.
 ;;;;
 ;;;; The bodies reference functions and specials defined in later files
-;;;; (PS-PATH, PARSE-ERROR-HERE, SERIALIZATION-ERROR, ...); that is fine
-;;;; because a macro's expansion is only evaluated where it is *used*, and the
-;;;; :SERIAL system loads those definitions before any use site is compiled.
+;;;; (PS-PATH, PARSE-ERROR-HERE, ...); that is fine because a macro's
+;;;; expansion is only evaluated where it is *used*, and the :SERIAL system
+;;;; loads those definitions before any use site is compiled.
 (in-package #:json-kit)
 
 ;;; ---------------------------------------------------------------------
-;;; Reader: JSON path bookkeeping
+;;; JSON path bookkeeping
 ;;; ---------------------------------------------------------------------
 (defmacro with-parser-path ((state component) &body body)
   "Run BODY with COMPONENT pushed onto STATE's error path, then always pop it.
@@ -27,7 +27,7 @@ array index currently being read, even when BODY unwinds via an error."
          (setf (ps-path ,state-var) ,saved)))))
 
 ;;; ---------------------------------------------------------------------
-;;; Reader: nesting and separator scaffolding
+;;; Nesting and separator scaffolding
 ;;; ---------------------------------------------------------------------
 (defmacro with-nesting-guard ((state) &body body)
   "Run BODY one nesting level deeper in STATE, signalling before MAX-DEPTH is
@@ -59,7 +59,7 @@ character so it can serve as a CASE key."
        (t (parse-error-here ,state ,separator-message)))))
 
 ;;; ---------------------------------------------------------------------
-;;; Reader: user callbacks in continuation-passing style
+;;; User callbacks in continuation-passing style
 ;;; ---------------------------------------------------------------------
 (defmacro with-json-callback ((result-var state label function &rest arguments)
                               &body continuation)
@@ -73,7 +73,7 @@ never misreported as a callback failure."
                          (lambda (,result-var) ,@continuation)))
 
 ;;; ---------------------------------------------------------------------
-;;; Reader: optional wall-clock timeout
+;;; Optional wall-clock timeout
 ;;; ---------------------------------------------------------------------
 (defmacro with-optional-timeout ((timeout-seconds) &body body)
   "Run BODY under an SB-EXT:WITH-TIMEOUT budget of TIMEOUT-SECONDS when it is
@@ -87,33 +87,11 @@ enforceable bound in that case."
        (progn ,@body)))
 
 ;;; ---------------------------------------------------------------------
-;;; Writer: serialization path and cycle guarding
+;;; Data-driven string escapes (decode direction)
 ;;; ---------------------------------------------------------------------
-(defmacro with-json-path ((component) &body body)
-  "Run BODY with COMPONENT pushed onto the dynamic serialization path so a
-JSON-SERIALIZATION-ERROR can report where in the value it occurred."
-  `(let ((*json-serialization-path* (cons ,component *json-serialization-path*)))
-     ,@body))
-
-(defmacro with-active-aggregate ((value) &body body)
-  "Run BODY while VALUE is marked as an in-progress aggregate, signalling a
-serialization error if VALUE is already being written (a reference cycle).
-The mark is always cleared on the way out so shared -- but acyclic -- subtrees
-remain writable."
-  (let ((value-var (gensym "VALUE")))
-    `(let ((,value-var ,value))
-       (when (gethash ,value-var *json-active-aggregates*)
-         (serialization-error "circular aggregate value"))
-       (setf (gethash ,value-var *json-active-aggregates*) t)
-       (unwind-protect (progn ,@body)
-         (remhash ,value-var *json-active-aggregates*)))))
-
-;;; ---------------------------------------------------------------------
-;;; Shared: data-driven string escapes
-;;; ---------------------------------------------------------------------
-;;; Both macros expand +JSON-SHORT-ESCAPES+ (see data.lisp) into a CASE at
-;;; compile time, so the reader and writer share one table with no runtime
-;;; lookup cost and no risk of the two directions disagreeing.
+;;; Expands +JSON-SHORT-ESCAPES+ (see data.lisp) into a CASE at compile time;
+;;; JSON-ESCAPE-LETTER in writer-macros.lisp expands the same table for the
+;;; encode direction, so the two can never drift apart.
 (defmacro json-unescape-char (letter)
   "Character named by an escape LETTER following a backslash, or NIL if LETTER
 is not a recognised short escape.  `u' is intentionally excluded: it begins a
@@ -124,54 +102,30 @@ multi-character \\uXXXX sequence the caller must handle separately."
              collect `(,letter-char ,character))
      (t nil)))
 
-(defmacro json-escape-letter (character)
-  "Escape letter for CHARACTER's short escape sequence, or NIL when CHARACTER
-has no short escape (so the caller falls back to \", \\ or \\uXXXX)."
-  `(case ,character
-     ,@(loop for (character-key . letter-char) in +json-short-escapes+
-             collect `(,character-key ,letter-char))
-     (t nil)))
+(defmacro do-mantissa-digits ((digit-value token start end) &body body)
+  "Walk TOKEN's characters from START below END (a scanned number's mantissa
+span), skipping the single decimal point if present, binding DIGIT-VALUE to
+each digit's numeric value and running BODY.  Shared by
+NUMBER-TOKEN-PROPERTIES (checking for an all-zero coefficient) and
+EXACT-NUMBER-VALUE (accumulating the coefficient's exact integer value)."
+  (let ((token-var (gensym "TOKEN"))
+        (index (gensym "INDEX"))
+        (character (gensym "CHARACTER")))
+    `(let ((,token-var ,token))
+       (loop for ,index from ,start below ,end
+             for ,character = (char ,token-var ,index)
+             unless (char= ,character #\.)
+               do (let ((,digit-value (ascii-json-digit-value ,character)))
+                    ,@body)))))
 
-;;; ---------------------------------------------------------------------
-;;; Shared: bounded proper-list traversal
-;;; ---------------------------------------------------------------------
-(defmacro do-proper-list ((element list &key count improper circular) &body body)
-  "Walk LIST as a proper list with Brent's cycle detection, binding ELEMENT to
-each car and running BODY, and evaluate to the total element count.
-
-If COUNT is a symbol it is bound, during BODY, to the number of elements
-already processed (a 0-based index) so BODY can enforce a size bound.  The
-IMPROPER form runs on reaching a dotted tail and the CIRCULAR form runs on
-detecting a cycle; both are expected to transfer control (typically by
-signalling)."
-  (let ((cursor (gensym "CURSOR"))
-        (tortoise (gensym "TORTOISE"))
-        (power (gensym "POWER"))
-        (step (gensym "STEP"))
-        (total (gensym "TOTAL"))
-        (count-var (or count (gensym "INDEX"))))
-    `(let ((,cursor ,list)
-           (,tortoise ,list)
-           (,power 1)
-           (,step 0)
-           (,total 0))
-       (declare (ignorable ,total))
-       (loop
-         (when (null ,cursor) (return ,total))
-         (unless (consp ,cursor)
-           ,@(when improper (list improper))
-           (return ,total))
-         (let ((,element (car ,cursor))
-               (,count-var ,total))
-           (declare (ignorable ,element ,count-var))
-           ,@body)
-         (incf ,total)
-         (setf ,cursor (cdr ,cursor))
-         (incf ,step)
-         (when (eq ,cursor ,tortoise)
-           ,@(when circular (list circular))
-           (return ,total))
-         (when (= ,step ,power)
-           (setf ,tortoise ,cursor
-                 ,power (* 2 ,power)
-                 ,step 0))))))
+(defmacro call-with-forwarded-parse-keywords (function &rest leading-arguments)
+  "Call FUNCTION with LEADING-ARGUMENTS followed by every keyword in
++PARSE-KEYWORDS+, each forwarded from a same-named lexical variable already
+bound in the caller.  PARSE uses this so a new entry in +PARSE-KEYWORDS+ never
+needs a second, hand-written forwarding edit here.  +PARSE-KEYWORDS+ is looked
+up via SYMBOL-VALUE, not referenced directly, because READER-MACROS.LISP loads
+before PARSER-STATE.LISP defines it; only this macro's *expansion* -- compiled
+later, once a caller like PARSE is compiled -- ever needs its value."
+  `(funcall ,function ,@leading-arguments
+            ,@(loop for keyword in (symbol-value '+parse-keywords+)
+                    append (list keyword (intern (symbol-name keyword))))))

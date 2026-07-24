@@ -23,21 +23,18 @@ circular list and enforcing MAX-ELEMENTS as it counts."
                    (length sequence))))
     (ensure-element-count count)
     (with-active-aggregate (sequence)
-      (labels ((write-element (element index)
-                 (unless (zerop index) (emit-character #\,))
-                 (when *json-pretty* (emit-indent (1+ level)))
-                 (with-json-path (index)
-                   (write-json-value element (1+ level)))))
-        (emit-character #\[)
-        (if (listp sequence)
-            (loop for element in sequence
-                  for index from 0
-                  do (write-element element index))
-            (loop for element across sequence
-                  for index from 0
-                  do (write-element element index)))
-        (when (and *json-pretty* (plusp count)) (emit-indent level))
-        (emit-character #\])))))
+      (with-json-brackets (#\[ #\] level count)
+        (labels ((write-element (element index)
+                   (emit-json-member (index level)
+                     (with-json-path (index)
+                       (write-json-value element (1+ level))))))
+          (if (listp sequence)
+              (loop for element in sequence
+                    for index from 0
+                    do (write-element element index))
+              (loop for element across sequence
+                    for index from 0
+                    do (write-element element index))))))))
 
 ;;; ---------------------------------------------------------------------
 ;;; Objects from hash tables
@@ -74,26 +71,23 @@ circular list and enforcing MAX-ELEMENTS as it counts."
         (pairs (when *json-sort-keys* (validated-object-pairs table))))
     (unless *json-sort-keys* (validate-object-keys table))
     (with-active-aggregate (table)
-      (labels ((write-member (key value index)
-                 (unless (zerop index) (emit-character #\,))
-                 (when *json-pretty* (emit-indent (1+ level)))
-                 (write-json-string key)
-                 (emit-string (if *json-pretty* ": " ":"))
-                 (with-json-path (key)
-                   (write-json-value value (1+ level)))))
-        (emit-character #\{)
-        (if *json-sort-keys*
-            (loop for (key . value) in pairs
-                  for index from 0
-                  do (write-member key value index))
-            (let ((index 0))
-              (maphash
-               (lambda (key value)
-                 (write-member key value index)
-                 (incf index))
-               table)))
-        (when (and *json-pretty* (plusp count)) (emit-indent level))
-        (emit-character #\})))))
+      (with-json-brackets (#\{ #\} level count)
+        (labels ((write-member (key value index)
+                   (emit-json-member (index level)
+                     (write-json-string key)
+                     (emit-string (if *json-pretty* ": " ":"))
+                     (with-json-path (key)
+                       (write-json-value value (1+ level))))))
+          (if *json-sort-keys*
+              (loop for (key . value) in pairs
+                    for index from 0
+                    do (write-member key value index))
+              (let ((index 0))
+                (maphash
+                 (lambda (key value)
+                   (write-member key value index)
+                   (incf index))
+                 table))))))))
 
 ;;; ---------------------------------------------------------------------
 ;;; Objects from ordered JSON-OBJECTs
@@ -109,17 +103,14 @@ circular list and enforcing MAX-ELEMENTS as it counts."
       (unless (stringp (car pair))
         (serialization-error "JSON object keys must be strings, got ~S" (car pair))))
     (with-active-aggregate (object)
-      (emit-character #\{)
-      (loop for (key . value) in members
-            for index from 0
-            do (unless (zerop index) (emit-character #\,))
-               (when *json-pretty* (emit-indent (1+ level)))
-               (write-json-string key)
-               (emit-string (if *json-pretty* ": " ":"))
-               (with-json-path (key)
-                 (write-json-value value (1+ level))))
-      (when (and *json-pretty* (plusp count)) (emit-indent level))
-      (emit-character #\}))))
+      (with-json-brackets (#\{ #\} level count)
+        (loop for (key . value) in members
+              for index from 0
+              do (emit-json-member (index level)
+                   (write-json-string key)
+                   (emit-string (if *json-pretty* ": " ":"))
+                   (with-json-path (key)
+                     (write-json-value value (1+ level)))))))))
 
 ;;; ---------------------------------------------------------------------
 ;;; Type dispatch

@@ -5,7 +5,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     cl-weave = {
-      url = "github:nerima-lisp/cl-weave/v0.9.0";
+      url = "github:nerima-lisp/cl-weave/v0.10.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -51,13 +51,16 @@
           default =
             pkgs.runCommand "cl-json-kit-tests"
               {
-                nativeBuildInputs = [ pkgs.sbcl ];
+                nativeBuildInputs = [
+                  pkgs.sbcl
+                  pkgs.coreutils
+                ];
                 CL_SOURCE_REGISTRY = sourceRegistry;
               }
               ''
                 export HOME="$TMPDIR/home"
                 mkdir -p "$HOME" "$out"
-                sbcl --script ${self}/run-tests.lisp
+                timeout 120 sbcl --script ${self}/run-tests.lisp
                 touch "$out/passed"
               '';
         }
@@ -69,10 +72,13 @@
           pkgs = nixpkgs.legacyPackages.${system};
           test = pkgs.writeShellApplication {
             name = "cl-json-kit-test";
-            runtimeInputs = [ pkgs.sbcl ];
+            runtimeInputs = [
+              pkgs.sbcl
+              pkgs.coreutils
+            ];
             text = ''
               export CL_SOURCE_REGISTRY="${sourceRegistry}"
-              exec sbcl --script ${self}/run-tests.lisp
+              exec timeout 120 sbcl --script ${self}/run-tests.lisp
             '';
           };
         in

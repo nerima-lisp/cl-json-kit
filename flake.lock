@@ -8,16 +8,16 @@
         "paredit-cli": "paredit-cli"
       },
       "locked": {
-        "lastModified": 1784777208,
-        "narHash": "sha256-NAad+UCV8u4mMd/E5xV1pQj7sOCJxx7E4B0FcZ1YNR0=",
+        "lastModified": 1784866842,
+        "narHash": "sha256-uFdqahTn9aTgFYnV8tkY5CLI53EGxSZGXjW6Ky1NgXY=",
         "owner": "nerima-lisp",
         "repo": "cl-weave",
-        "rev": "a0222d9d7650e3799b08a7f87eb5d34b1a050998",
+        "rev": "7ddc1a283878878a58ec90ab6d4742be86868ba8",
         "type": "github"
       },
       "original": {
         "owner": "nerima-lisp",
-        "ref": "v0.9.0",
+        "ref": "v0.10.0",
         "repo": "cl-weave",
         "type": "github"
       }

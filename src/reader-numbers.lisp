@@ -36,14 +36,11 @@ before the bound is checked."
          (exponent 0)
          (exponent-negative-p nil)
          (exponent-limit (+ (ps-max-exact-exponent state) fractional-digits)))
-    (loop for index from mantissa-start below exponent-position
-          for character = (char token index)
-          unless (char= character #\.)
-            do (unless (char= character #\0)
-                 (setf coefficient-zero-p nil)))
+    (do-mantissa-digits (digit-value token mantissa-start exponent-position)
+      (unless (zerop digit-value) (setf coefficient-zero-p nil)))
     (when (< exponent-position length)
       (let ((index (1+ exponent-position)))
-        (when (member (char token index) '(#\+ #\-))
+        (when (member (char token index) +json-sign-characters+)
           (setf exponent-negative-p (char= (char token index) #\-))
           (incf index))
         (loop while (< index length)
@@ -73,11 +70,8 @@ lose precision (very large or very small magnitudes)."
           (exponent-position
             (or (position #\e token :test #'char-equal) (length token))))
       (unless coefficient-zero-p
-        (loop for index from mantissa-start below exponent-position
-              for character = (char token index)
-              unless (char= character #\.)
-                do (setf coefficient
-                         (+ (* coefficient 10) (ascii-json-digit-value character)))))
+        (do-mantissa-digits (digit-value token mantissa-start exponent-position)
+          (setf coefficient (+ (* coefficient 10) digit-value))))
       (let ((magnitude
               (cond
                 (coefficient-zero-p 0)
@@ -113,10 +107,10 @@ advancing past it.  Enforces MAX-NUMBER-LENGTH as each character is consumed."
         (setf floating-point-p t)
         (advance)
         (require-digits))
-      (when (member (ps-peek state) '(#\e #\E))
+      (when (member (ps-peek state) +json-exponent-markers+)
         (setf floating-point-p t)
         (advance)
-        (when (member (ps-peek state) '(#\+ #\-)) (advance))
+        (when (member (ps-peek state) +json-sign-characters+) (advance))
         (require-digits))
       (values (subseq (ps-text state) start (ps-pos state)) floating-point-p))))
 

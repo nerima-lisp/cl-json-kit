@@ -17,7 +17,8 @@ correctly, and parsing can be bounded with a timeout."
   :serial t
   :components ((:file "package")
                (:file "data")
-               (:file "macros")
+               (:file "reader-macros")
+               (:file "writer-macros")
                (:file "conditions")
                (:file "parser-state")
                (:file "reader-strings")

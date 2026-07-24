@@ -111,18 +111,7 @@ index.  Validates every option before touching the input."
                 (max-object-members 1000000) (context "json") timeout-seconds)
   "Parse STRING as exactly one complete JSON text, rejecting trailing data."
   (multiple-value-bind (value end-index)
-      (%parse-prefix string 0
-                     :object-type object-type :array-type array-type
-                     :duplicate-key-policy duplicate-key-policy
-                     :null-value null-value :false-value false-value :true-value true-value
-                     :key-decoder key-decoder :number-decoder number-decoder
-                     :object-hook object-hook :array-hook array-hook
-                     :max-depth max-depth :max-input-length max-input-length
-                     :max-string-length max-string-length :max-number-length max-number-length
-                     :max-exact-exponent max-exact-exponent
-                     :max-array-elements max-array-elements
-                     :max-object-members max-object-members
-                     :context context :timeout-seconds timeout-seconds)
+      (call-with-forwarded-parse-keywords #'%parse-prefix string 0)
     (let ((position end-index)
           (length (length string)))
       (loop while (and (< position length)
