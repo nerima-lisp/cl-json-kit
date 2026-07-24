@@ -14,3 +14,5 @@ tmp-debug/
 
 # Serena project cache
 .serena/cache/
+
+.worktrees/
