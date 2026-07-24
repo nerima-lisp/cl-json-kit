@@ -158,17 +158,47 @@ does not terminate or would exceed the output budget."
 ;;; Strings
 ;;; ---------------------------------------------------------------------
 (defun write-json-string (string)
-  "Serialize STRING as a quoted, escaped JSON string, rejecting raw surrogates."
+  "Serialize STRING as a quoted, escaped JSON string, rejecting raw surrogates.
+Contiguous unescaped characters are flushed as a single WRITE-STRING run and
+only an escape or control character interrupts the run, so an ordinary string
+costs one write rather than one per character."
+  (declare (type string string))
   (emit-character #\")
-  (loop for character across string
-        for code = (char-code character)
-        do (let ((letter (json-escape-letter character)))
-             (cond
-               ((<= #xd800 code #xdfff)
-                (serialization-error "JSON strings cannot contain raw surrogate characters"))
-               (letter (emit-character #\\) (emit-character letter))
-               ((char= character #\") (emit-string "\\\""))
-               ((char= character #\\) (emit-string "\\\\"))
-               ((< code #x20) (emit-string (format nil "\\u~4,'0X" code)))
-               (t (emit-character character)))))
+  (let ((size (length string))
+        (run-start 0))
+    (declare (type fixnum size run-start))
+    (labels ((flush-run (end)
+               ;; Emit STRING[run-start, end) verbatim.  When the whole run fits
+               ;; the budget it is one RESERVE-OUTPUT and one WRITE-STRING; when
+               ;; it would overrun, fall back to character-at-a-time so the
+               ;; stream stops at exactly the byte the bounded path would and
+               ;; RESERVE-OUTPUT signals there.
+               (when (< run-start end)
+                 (let ((length (- end run-start)))
+                   (if (or (null *json-maximum-output-length*)
+                           (<= length (- *json-maximum-output-length* *json-output-count*)))
+                       (progn
+                         (reserve-output length)
+                         (write-string string *json-output-stream* :start run-start :end end))
+                       (loop for index from run-start below end
+                             do (emit-character (char string index))))))))
+      (loop for index below size
+            for character = (char string index)
+            for code = (char-code character)
+            do (let ((letter (json-escape-letter character)))
+                 (cond
+                   ((<= #xd800 code #xdfff)
+                    (flush-run index)
+                    (serialization-error "JSON strings cannot contain raw surrogate characters"))
+                   (letter (flush-run index) (emit-character #\\) (emit-character letter)
+                           (setf run-start (1+ index)))
+                   ((char= character #\") (flush-run index) (emit-string "\\\"")
+                    (setf run-start (1+ index)))
+                   ((char= character #\\) (flush-run index) (emit-string "\\\\")
+                    (setf run-start (1+ index)))
+                   ((< code #x20) (flush-run index) (emit-string (format nil "\\u~4,'0X" code))
+                    (setf run-start (1+ index)))
+                   ;; An ordinary character extends the current run.
+                   (t nil))))
+      (flush-run size)))
   (emit-character #\"))

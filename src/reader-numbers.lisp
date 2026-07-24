@@ -148,13 +148,90 @@ out of float range.  Signed zero is preserved."
                     (parse-error-here state "JSON number")))
             (error () (exact-number-value state token)))))))
 
+(defun scan-integer-fast (state)
+  "Fast path for a plain JSON integer parsed without a NUMBER-DECODER: scan it
+directly and return its exact value, accumulating a FIXNUM until it would
+overflow and only then widening to a bignum, so the overwhelmingly common
+integer case never allocates a token string.
+
+Returns NIL, leaving the cursor untouched, for anything that is not a
+well-formed plain integer within MAX-NUMBER-LENGTH -- a leading '-' with no
+digit, a value that continues into a '.'/'e'/'E' float, or an over-long token --
+so SCAN-NUMBER remains the single source of grammar validation and diagnostics
+for those cases."
+  (let* ((text (ps-text state))
+         (length (ps-length state))
+         (start (ps-pos state))
+         (limit (min length (+ start (ps-max-number-length state))))
+         (position start)
+         (negative-p nil)
+         (fixnum-cutoff (load-time-value (floor most-positive-fixnum 10)))
+         (fixnum-remainder (load-time-value (mod most-positive-fixnum 10)))
+         (fixnum-value 0)
+         (value 0)
+         (overflow-p nil))
+    (declare (type simple-string text)
+             (type fixnum length start limit position fixnum-cutoff fixnum-remainder
+                   fixnum-value)
+             (type unsigned-byte value))
+    (flet ((fall-back ()
+             (setf (ps-pos state) start)
+             (return-from scan-integer-fast nil)))
+      ;; Optional leading minus.
+      (when (and (< position length) (char= (schar text position) #\-))
+        (setf negative-p t)
+        (incf position))
+      ;; At least one digit is required; hand malformed input to SCAN-NUMBER.
+      (unless (and (< position length) (char<= #\0 (schar text position) #\9))
+        (fall-back))
+      (cond
+        ;; A leading zero stands alone (RFC 8259 forbids "01"); consume only it.
+        ((char= (schar text position) #\0)
+         (when (>= position limit) (fall-back))
+         (incf position))
+        ;; Otherwise accumulate the [1-9][0-9]* run, switching to a bignum once
+        ;; the running FIXNUM can no longer take another digit.
+        (t
+         (loop while (< position length)
+               for code fixnum = (char-code (schar text position))
+               while (<= #x30 code #x39)
+               for digit fixnum = (- code #x30)
+               do (when (>= position limit) (fall-back))
+                  (if (or (< fixnum-value fixnum-cutoff)
+                          (and (= fixnum-value fixnum-cutoff)
+                               (<= digit fixnum-remainder)))
+                      (setf fixnum-value
+                            (the fixnum (+ (the fixnum (* fixnum-value 10)) digit)))
+                      (progn
+                        (setf overflow-p t
+                              value (+ (* fixnum-value 10) digit))
+                        (incf position)
+                        (loop while (< position length)
+                              for rest-code fixnum = (char-code (schar text position))
+                              while (<= #x30 rest-code #x39)
+                              do (when (>= position limit) (fall-back))
+                                 (setf value (+ (* value 10) (- rest-code #x30)))
+                                 (incf position))
+                        (return)))
+                  (incf position))
+         (unless overflow-p (setf value fixnum-value))))
+      ;; A trailing '.', 'e', or 'E' means this token is really a float.
+      (when (< position length)
+        (let ((next (schar text position)))
+          (when (or (char= next #\.) (char= next #\e) (char= next #\E))
+            (fall-back))))
+      (setf (ps-pos state) position)
+      (if negative-p (- value) value))))
+
 (defun parse-number (state)
   "Parse a JSON number, honouring a user NUMBER-DECODER when present."
-  (multiple-value-bind (token floating-point-p) (scan-number state)
-    (cond
-      ((ps-number-decoder state)
-       (with-json-callback (value state "NUMBER-DECODER"
-                                  (ps-number-decoder state) token (not floating-point-p))
-         value))
-      (floating-point-p (decode-float-token state token))
-      (t (decode-integer-token token)))))
+  (or (and (not (ps-number-decoder state))
+           (scan-integer-fast state))
+      (multiple-value-bind (token floating-point-p) (scan-number state)
+        (cond
+          ((ps-number-decoder state)
+           (with-json-callback (value state "NUMBER-DECODER"
+                                      (ps-number-decoder state) token (not floating-point-p))
+             value))
+          (floating-point-p (decode-float-token state token))
+          (t (decode-integer-token token))))))

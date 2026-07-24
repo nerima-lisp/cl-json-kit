@@ -21,24 +21,35 @@ VALUE, or signal a parse error."
 ;;; ---------------------------------------------------------------------
 ;;; Unicode escapes
 ;;; ---------------------------------------------------------------------
-(defun hex-digit-value (character)
-  (cond
-    ((char<= #\0 character #\9) (- (char-code character) (char-code #\0)))
-    ((char<= #\A character #\F) (+ 10 (- (char-code character) (char-code #\A))))
-    ((char<= #\a character #\f) (+ 10 (- (char-code character) (char-code #\a))))
-    (t nil)))
-
 (defun parse-hex4 (state)
   "Read exactly four hex digits at the cursor, returning their value and
-advancing past them."
-  (let ((code 0))
-    (dotimes (index 4 code)
+advancing past them.  Works directly on the backing string with FIXNUM
+arithmetic, so no per-digit character dispatch or generic multiply is needed."
+  (let ((text (ps-text state))
+        (length (ps-length state))
+        (position (ps-pos state))
+        (value 0))
+    (declare (type simple-string text)
+             (type fixnum length position value))
+    (dotimes (index 4)
       (declare (ignore index))
-      (let* ((character (ps-peek state))
-             (digit (and character (hex-digit-value character))))
-        (unless digit (parse-error-here state))
-        (setf code (+ (* code 16) digit))
-        (ps-advance state)))))
+      (when (>= position length)
+        (setf (ps-pos state) position)
+        (parse-error-here state))
+      (let* ((code (char-code (schar text position)))
+             (digit (cond
+                      ((<= #x30 code #x39) (- code #x30))
+                      ((<= #x41 code #x46) (+ 10 (- code #x41)))
+                      ((<= #x61 code #x66) (+ 10 (- code #x61)))
+                      (t nil))))
+        (declare (type fixnum code) (type (or null fixnum) digit))
+        (unless digit
+          (setf (ps-pos state) position)
+          (parse-error-here state))
+        (setf value (logior (ash value 4) digit))
+        (incf position)))
+    (setf (ps-pos state) position)
+    value))
 
 (defun parse-unicode-escape (state)
   "Decode a \\uXXXX escape whose leading \\u the caller has consumed, combining
