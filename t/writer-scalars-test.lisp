@@ -66,6 +66,26 @@
           (when (zerop value)
             (expect (= (float-sign roundtrip) (float-sign value)) :to-be-truthy))))))
 
+  (it "serializes a float identically under every *READ-DEFAULT-FLOAT-FORMAT*"
+    ;; The printer appends a Lisp exponent marker whenever the float's format
+    ;; differs from *READ-DEFAULT-FLOAT-FORMAT*, so before this was pinned down
+    ;; 3.14d0 serialized as "3.14e0" in a default image and as "3.14" in one
+    ;; whose default had been set to DOUBLE-FLOAT.  Output must depend on the
+    ;; value alone, never on ambient state of the calling image.
+    (with-soft-assertions
+      (dolist (value (list 3.14d0 1.5d0 1.0d0 1.0d308 1.0d-5
+                           3.14f0 1.5f0 1.0f0 1.0f10))
+        (let ((under-single (let ((*read-default-float-format* 'single-float))
+                              (stringify value)))
+              (under-double (let ((*read-default-float-format* 'double-float))
+                              (stringify value))))
+          (expect (list value under-single) :to-equal (list value under-double))))
+      (let ((*read-default-float-format* 'single-float))
+        (expect 3.14d0 :to-stringify-as "3.14")
+        (expect 1.0d308 :to-stringify-as "1.0e308"))
+      (let ((*read-default-float-format* 'double-float))
+        (expect 1.5f0 :to-stringify-as "1.5"))))
+
   (it-each ((1/2 "0.5") (-1/40 "-0.025") (123/25 "4.92"))
       "writes the terminating ratio ~S as ~S"
       (value expected)
