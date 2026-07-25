@@ -20,6 +20,12 @@ All notable changes to this project will be documented in this file.
   dynamic call trace across the full test suite (zero calls) plus a
   by-construction argument that every fallback case it existed for either
   signals in `scan-number` or turns out to be a float.
+- Removed `do-mantissa-digits`: an orphaned macro with zero call sites,
+  whose docstring referenced function names that no longer exist in `src/`.
+- Consolidated the NIL/function/fbound-symbol callback-designator coercion
+  that `resolve-parser-callback` (reader) and `resolve-number-encoder`
+  (writer) each hand-wrote independently into one shared
+  `resolve-callback-designator` macro.
 
 ## [0.3.0] - 2026-07-25
 
