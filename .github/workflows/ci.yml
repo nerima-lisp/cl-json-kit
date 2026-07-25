@@ -17,6 +17,9 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # A hung SBCL test would otherwise hold a runner for the full 6-hour
+    # default. `nix flake check` finishes in about 4 minutes from a cold cache.
+    timeout-minutes: 30
     steps:
       # persist-credentials: false — this job runs untrusted PR code via
       # `nix flake check`, and never needs the token, so don't leave it in
