@@ -48,7 +48,15 @@
             (:constructor %make-json-object (members))
             (:copier nil)
             (:conc-name %json-object-))
+  "An ordered JSON object: member order and duplicate keys are preserved exactly
+as given, which a HASH-TABLE cannot do.  Opaque -- construct one with
+MAKE-JSON-OBJECT or ALIST->JSON-OBJECT and read it with JSON-OBJECT-MEMBERS."
   (members nil :type list :read-only t))
+
+;;; DEFSTRUCT has nowhere to put a docstring on its generated predicate.
+(setf (documentation 'json-object-p 'function)
+      "True when VALUE is an ordered JSON object built by MAKE-JSON-OBJECT or
+ALIST->JSON-OBJECT, which STRINGIFY and WRITE-JSON serialize as a JSON object.")
 
 ;;; ---------------------------------------------------------------------
 ;;; Canonical two-character string escapes

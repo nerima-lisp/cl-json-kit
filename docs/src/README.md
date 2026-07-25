@@ -39,6 +39,14 @@ the full API surface.
 
     [:octicons-arrow-right-24: API reference](api-reference.md)
 
+-   :material-shield-check: **Stable API**
+
+    ---
+
+    What 1.0 promises, what it deliberately does not, and how to report a break.
+
+    [:octicons-arrow-right-24: Compatibility promise](compatibility.md)
+
 -   :material-speedometer: **Benchmarks**
 
     ---
@@ -80,6 +88,13 @@ input can grow without limit.
   [position, line, column, path, and a bounded snippet](error-handling.md).
 - **No runtime dependencies.** The runtime system depends on nothing beyond the
   Common Lisp standard; only the test system uses `cl-weave`.
+- **Measured conformance.** The full [JSONTestSuite](https://github.com/nst/JSONTestSuite)
+  parsing corpus is vendored into the test suite and runs on every build — all
+  95 must-accept cases accepted, all 188 must-reject cases rejected, and every
+  implementation-defined answer pinned. See [RFC 8259 Scope](rfc-8259.md).
+- **A stable API.** From 1.0.0 on, the exported surface follows
+  [Semantic Versioning](compatibility.md), and the export list itself is
+  asserted by the test suite so it cannot change by accident.
 
 ## At a glance
 

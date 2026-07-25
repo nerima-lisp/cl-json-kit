@@ -134,6 +134,7 @@ nav:
   - Reference:
       - API Reference: api-reference.md
       - RFC 8259 Scope: rfc-8259.md
+      - Compatibility Promise: compatibility.md
   - Benchmarks: benchmarks.md
   - Project:
       - Changelog: changelog.md

@@ -40,6 +40,23 @@ nix flake check
 The test system (`cl-json-kit/test`) uses `cl-weave` and lives under `t/`. It
 includes a property-based fuzzing suite over `parse`.
 
+Two files there guard the project's standing promises rather than any one
+feature, and are worth knowing about before changing them:
+
+- **`t/public-api-test.lisp`** pins the exact set of symbols the `json-kit`
+  package exports and requires a docstring on each. Adding or removing an export
+  fails this spec by design — update the list in the same commit, and classify
+  the change against the [Compatibility Promise](compatibility.md).
+- **`t/rfc8259-conformance-test.lisp`** vendors the parsing corpus of
+  [JSONTestSuite](https://github.com/nst/JSONTestSuite) (MIT) as data. It is
+  vendored rather than fetched so conformance is checked offline inside the Nix
+  sandbox. Each case is stored as a list of ASCII string chunks and character
+  codes, which keeps the file pure ASCII and makes every code point explicit
+  instead of dependent on the external format used to load the source. The 25
+  corpus cases whose input is not well-formed UTF-8 are listed by name in the
+  file's header and deliberately excluded, because this library's API consumes
+  characters rather than octets.
+
 ## Running the benchmarks
 
 See [Benchmarks](benchmarks.md) for the full harness documentation. In short:

@@ -406,6 +406,27 @@ multiple-value stream framing, comments, trailing commas, JSON5 extensions,
 and arbitrary-precision decimal preservation without a custom
 `number-decoder`/`number-encoder` are non-goals.
 
+Conformance is measured rather than asserted. The whole parsing corpus of
+[JSONTestSuite](https://github.com/nst/JSONTestSuite) is vendored into
+`t/rfc8259-conformance-test.lisp` and runs on every build: all 95 `y_`
+must-accept cases are accepted, all 188 `n_` must-reject cases are rejected,
+nothing crashes or signals anything but `json-parse-error`, and this library's
+answer to each implementation-defined `i_` case is pinned by a test so it cannot
+change silently. See
+[RFC 8259 Scope](https://nerima-lisp.github.io/cl-json-kit/rfc-8259/) for the
+full breakdown.
+
+## Compatibility
+
+From 1.0.0 on, the exported surface of the `json-kit` package and its documented
+behavior follow [Semantic Versioning](https://semver.org/). The export list and
+the presence of a docstring on every exported symbol are asserted by the test
+suite, so the public API cannot change by accident. Internal (`json-kit::`)
+symbols, the exact text of error messages, and benchmark numbers are explicitly
+not covered — see the
+[Compatibility Promise](https://nerima-lisp.github.io/cl-json-kit/compatibility/)
+for the full statement.
+
 ## Testing
 
 ```sh
