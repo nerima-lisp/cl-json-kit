@@ -1,5 +1,8 @@
 # cl-json-kit
 
+[![CI](https://github.com/nerima-lisp/cl-json-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/nerima-lisp/cl-json-kit/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 `cl-json-kit` is a dependency-free JSON reader and writer for Common Lisp. It
 provides string and character-stream APIs, explicit object/array mappings,
 opaque values for JSON `null` and `false`, bounded resource use, and structured
