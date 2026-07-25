@@ -110,7 +110,22 @@
                                  expected))
                     :to-be-truthy)
             (expect (= json-kit::*json-output-count* (length output))
-                    :to-be-truthy)))))))
+                    :to-be-truthy))))))
+
+  (it "uses the buffered escape path for a long, escape-dense string with no output budget"
+    ;; WRITE-JSON-STRING's buffered branch activates only when
+    ;; *JSON-MAXIMUM-OUTPUT-LENGTH* is NIL and the string is both long
+    ;; (>= 128 characters) and escape-dense (>= 12 quote/backslash escapes in
+    ;; its first 128 characters). STRINGIFY/WRITE-JSON default MAX-OUTPUT-LENGTH
+    ;; to a finite bound, so :MAX-OUTPUT-LENGTH NIL is the only way to reach it.
+    (let* ((size 200)
+           (input (make-string size :initial-element #\"))
+           (expected (with-output-to-string (stream)
+                       (write-char #\" stream)
+                       (loop repeat size do (write-string "\\\"" stream))
+                       (write-char #\" stream))))
+      (expect (string= (stringify input :max-output-length nil) expected) :to-be-truthy)
+      (expect (string= (stringify input) expected) :to-be-truthy))))
 
 (describe "bounded dense string escaping"
   (it "keeps quote and backslash escapes atomic"
