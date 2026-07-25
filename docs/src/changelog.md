@@ -5,6 +5,25 @@ All notable changes to this project are documented here. This page mirrors
 at the repository root, which remains the source of truth. Releases are also
 listed on the [GitHub releases page](https://github.com/nerima-lisp/cl-json-kit/releases).
 
+## [Unreleased]
+
+### Changed
+
+- Internal readability pass over `src/`, all behavior-preserving: shared a
+  single `emit-object-member` between hash-table and ordered-object
+  serialization; reused `data.lisp`'s number-grammar vocabulary instead of
+  re-deriving it as separate string literals in `json-number-string-p`;
+  named `parse-object`'s two member-loop strategies and `parse-array`'s
+  vector chunk-growth strategy as `labels` functions instead of leaving them
+  inlined; extracted the coefficient-digit scan shared by
+  `exact-number-range-value` and `decode-float-range`, and the control-char
+  escape shared by `write-json-string`'s two branches.
+- Removed `decode-integer-range`: unreachable since `scan-integer-fast`
+  became a complete plain-integer scanner (bignums included), verified by a
+  dynamic call trace across the full test suite (zero calls) plus a
+  by-construction argument that every fallback case it existed for either
+  signals in `scan-number` or turns out to be a float.
+
 ## [0.3.0] - 2026-07-25
 
 No public API or observable behavior changed in this release; it adds
