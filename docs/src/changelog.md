@@ -9,6 +9,9 @@ listed on the [GitHub releases page](https://github.com/nerima-lisp/cl-json-kit/
 
 ### Changed
 
+- Bumped the `cl-weave` test dependency from v0.10.0 to v1.0.0 (`flake.lock`
+  refreshed accordingly). Purely additive on `cl-weave`'s side (new
+  journal/replay/soft-assertion API); no test changes required.
 - Internal readability pass over `src/`, all behavior-preserving: shared a
   single `emit-object-member` between hash-table and ordered-object
   serialization; reused `data.lisp`'s number-grammar vocabulary instead of
