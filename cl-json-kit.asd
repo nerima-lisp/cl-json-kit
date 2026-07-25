@@ -62,4 +62,7 @@ correctly, and parsing can be bounded with a timeout."
                (:file "writer-streams-test")
                (:file "writer-alist-test")
                (:file "property-test"))
-  :perform (test-op (operation component) (declare (ignore operation component)) (unless (funcall (symbol-function (find-symbol "RUN-TESTS" "CL-JSON-KIT/TEST"))) (error "cl-json-kit test suite failed"))))
+  :perform (test-op (operation component)
+             (declare (ignore operation component))
+             (unless (funcall (symbol-function (find-symbol "RUN-TESTS" "CL-JSON-KIT/TEST")))
+               (error "cl-json-kit test suite failed"))))
