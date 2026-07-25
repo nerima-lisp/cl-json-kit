@@ -19,6 +19,9 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Bumped the `cl-weave` test dependency from v0.10.0 to v1.0.0 (`flake.lock`
+  refreshed accordingly); required by `with-soft-assertions` below, which
+  v0.10.0 does not export.
 - Split `reader-test.lisp` and `writer-test.lisp` into 13 per-feature test
   files along their existing `describe`-block boundaries.
 - Test suite adopts previously-unused `cl-weave` features: a
