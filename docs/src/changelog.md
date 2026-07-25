@@ -5,6 +5,31 @@ All notable changes to this project are documented here. This page mirrors
 at the repository root, which remains the source of truth. Releases are also
 listed on the [GitHub releases page](https://github.com/nerima-lisp/cl-json-kit/releases).
 
+## [Unreleased]
+
+### Fixed
+
+- `json-parse-error` and `json-serialization-error` relied on an
+  `initialize-instance :after` method to bound and escape
+  attacker-influenced slots (`:context`, `:expected`, `:path`, `:message`)
+  exactly once, at construction. SBCL's `define-condition` classes are not
+  `standard-object`s and never dispatch through CLOS's `initialize-instance`
+  protocol, so that method silently never ran: a caller-supplied `:context`
+  string (or an oversized object key embedded in a serialization message)
+  reached the condition completely unbounded and unescaped. Every
+  construction site now goes through explicit `bounded-json-parse-error` /
+  `bounded-json-serialization-error` constructor functions instead.
+
+### Changed
+
+- Split `reader-test.lisp` and `writer-test.lisp` into 13 per-feature test
+  files along their existing `describe`-block boundaries.
+- Test suite adopts previously-unused `cl-weave` features: a
+  `gen-recursive`-built arbitrary-nested-JSON generator backs a new
+  round-trip property test, and `with-soft-assertions` collects every
+  failure in a multi-field diagnostic assertion instead of stopping at the
+  first.
+
 ## [0.3.0] - 2026-07-25
 
 No public API or observable behavior changed in this release; it adds
