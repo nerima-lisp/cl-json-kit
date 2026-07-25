@@ -53,11 +53,8 @@ built from CONTROL and ARGUMENTS."
 (defun resolve-number-encoder (designator)
   "Coerce a number-encoder DESIGNATOR (NIL, a function, or an fbound symbol)
 into a function or NIL."
-  (cond
-    ((null designator) nil)
-    ((functionp designator) designator)
-    ((and (symbolp designator) (fboundp designator)) (symbol-function designator))
-    (t (serialization-error "NUMBER-ENCODER must be a function designator"))))
+  (resolve-callback-designator designator
+    (serialization-error "NUMBER-ENCODER must be a function designator")))
 
 ;;; ---------------------------------------------------------------------
 ;;; Bounded output primitives

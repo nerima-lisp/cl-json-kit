@@ -32,6 +32,26 @@ listed on the [GitHub releases page](https://github.com/nerima-lisp/cl-json-kit/
   round-trip property test, and `with-soft-assertions` collects every
   failure in a multi-field diagnostic assertion instead of stopping at the
   first.
+- Internal readability pass over `src/`, all behavior-preserving: shared a
+  single `emit-object-member` between hash-table and ordered-object
+  serialization; reused `data.lisp`'s number-grammar vocabulary instead of
+  re-deriving it as separate string literals in `json-number-string-p`;
+  named `parse-object`'s two member-loop strategies and `parse-array`'s
+  vector chunk-growth strategy as `labels` functions instead of leaving them
+  inlined; extracted the coefficient-digit scan shared by
+  `exact-number-range-value` and `decode-float-range`, and the control-char
+  escape shared by `write-json-string`'s two branches.
+- Removed `decode-integer-range`: unreachable since `scan-integer-fast`
+  became a complete plain-integer scanner (bignums included), verified by a
+  dynamic call trace across the full test suite (zero calls) plus a
+  by-construction argument that every fallback case it existed for either
+  signals in `scan-number` or turns out to be a float.
+- Removed `do-mantissa-digits`: an orphaned macro with zero call sites,
+  whose docstring referenced function names that no longer exist in `src/`.
+- Consolidated the NIL/function/fbound-symbol callback-designator coercion
+  that `resolve-parser-callback` (reader) and `resolve-number-encoder`
+  (writer) each hand-wrote independently into one shared
+  `resolve-callback-designator` macro.
 
 ## [0.3.0] - 2026-07-25
 
