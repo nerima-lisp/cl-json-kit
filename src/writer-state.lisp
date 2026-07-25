@@ -40,12 +40,15 @@ built from CONTROL and ARGUMENTS."
 (defun validate-writer-options (indent maximum-depth maximum-elements maximum-output-length)
   (unless (and (integerp indent) (not (minusp indent)))
     (serialization-error "INDENT must be a non-negative integer, not ~S" indent))
-  (dolist (entry (list (cons "MAX-DEPTH" maximum-depth)
-                       (cons "MAX-ELEMENTS" maximum-elements)
-                       (cons "MAX-OUTPUT-LENGTH" maximum-output-length)))
-    (unless (valid-limit-p (cdr entry))
-      (serialization-error "~A must be NIL or a non-negative integer, not ~S"
-                           (car entry) (cdr entry)))))
+  (unless (valid-limit-p maximum-depth)
+    (serialization-error "MAX-DEPTH must be NIL or a non-negative integer, not ~S"
+                         maximum-depth))
+  (unless (valid-limit-p maximum-elements)
+    (serialization-error "MAX-ELEMENTS must be NIL or a non-negative integer, not ~S"
+                         maximum-elements))
+  (unless (valid-limit-p maximum-output-length)
+    (serialization-error "MAX-OUTPUT-LENGTH must be NIL or a non-negative integer, not ~S"
+                         maximum-output-length)))
 
 (defun resolve-number-encoder (designator)
   "Coerce a number-encoder DESIGNATOR (NIL, a function, or an fbound symbol)

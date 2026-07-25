@@ -48,9 +48,8 @@ result; with no decoder the key is returned unchanged."
 ;;; ---------------------------------------------------------------------
 ;;; Value dispatch
 ;;; ---------------------------------------------------------------------
-(defun parse-value (state)
-  "Parse any single JSON value at the cursor, after leading whitespace."
-  (skip-whitespace state)
+(defun parse-value-at-current (state)
+  "Parse one JSON value starting at the current cursor without skipping whitespace."
   (let ((character (ps-peek state)))
     (unless character (parse-error-here state "JSON value"))
     (cond
@@ -62,6 +61,11 @@ result; with no decoder the key is returned unchanged."
       ((char= character #\f) (parse-literal state "false" (ps-false-value state)))
       ((char= character #\n) (parse-literal state "null" (ps-null-value state)))
       (t (parse-error-here state "JSON value")))))
+
+(defun parse-value (state)
+  "Parse one JSON value after skipping leading RFC JSON whitespace."
+  (skip-whitespace state)
+  (parse-value-at-current state))
 
 ;;; ---------------------------------------------------------------------
 ;;; Objects
@@ -117,7 +121,7 @@ new) RESULT accumulator, exactly as RECORD-OBJECT-MEMBER does."
       (skip-whitespace state)
       (expect-char state #\:)
       (skip-whitespace state)
-      (let ((value (with-parser-path (state key) (parse-value state))))
+      (let ((value (with-parser-path (state key) (parse-value-at-current state))))
         (record-object-member state result seen converted-key value present-p prior)))))
 
 (defun parse-object (state)
@@ -125,24 +129,58 @@ new) RESULT accumulator, exactly as RECORD-OBJECT-MEMBER does."
   (with-nesting-guard (state)
     (expect-char state #\{)
     (skip-whitespace state)
-    ;; Fast path: a HASH-TABLE object under :LAST just overwrites on a repeat
-    ;; key, so it needs no separate SEEN table -- saving that allocation and a
-    ;; gethash/sethash per member, which dominates parsing a large object.
+    ;; The default HASH-TABLE/:LAST case can overwrite duplicates directly.
+    ;; Keep its member loop free of representation and duplicate-policy dispatch.
     (let* ((fast-last-p (and (eq (ps-object-type state) :hash-table)
                              (eq (ps-duplicate-key-policy state) :last)))
+           (key-decoder (when fast-last-p (ps-key-decoder state)))
+           (max-members (ps-max-object-members state))
            (result (when (eq (ps-object-type state) :hash-table)
-                     (make-hash-table :test #'equal)))
-           (seen (unless fast-last-p (make-hash-table :test #'equal)))
+                     (make-hash-table :test (function equal) :rehash-size 2.0)))
+           (seen
+             (unless (or fast-last-p
+                         (and (eq (ps-object-type state) :alist)
+                              (eq (ps-duplicate-key-policy state) :preserve)))
+               (make-hash-table :test (function equal))))
            (count 0))
       (unless (eql (ps-peek state) #\})
-        (loop
-          (when (>= count (ps-max-object-members state))
-            (parse-error-here state "fewer object members"))
-          (incf count)
-          (setf result (read-object-member state result seen))
-          (consume-separator-or-finish
-              (state #\} "object member" "comma or closing brace")
-            (return))))
+        (if fast-last-p
+            (let* ((saved-path (ps-path state))
+                   (path-frame (cons nil saved-path)))
+              (unwind-protect
+                   (loop
+                     (when (>= count max-members)
+                       (parse-error-here state "fewer object members"))
+                     (incf count)
+                     (unless (eql (ps-peek state) #\")
+                       (parse-error-here state "object key string"))
+                     (let* ((key (parse-json-string state))
+                            (converted-key
+                              (if key-decoder
+                                  (progn
+                                    (setf (car path-frame) key
+                                          (ps-path state) path-frame)
+                                    (prog1 (json-key->lisp-key key state)
+                                      (setf (ps-path state) saved-path)))
+                                  key)))
+                       (skip-whitespace state)
+                       (expect-char state #\:)
+                       (setf (car path-frame) key
+                             (ps-path state) path-frame
+                             (gethash converted-key result) (parse-value state)
+                             (ps-path state) saved-path))
+                     (consume-separator-or-finish
+                         (state #\} "object member" "comma or closing brace")
+                       (return)))
+                (setf (ps-path state) saved-path)))
+            (loop
+              (when (>= count max-members)
+                (parse-error-here state "fewer object members"))
+              (incf count)
+              (setf result (read-object-member state result seen))
+              (consume-separator-or-finish
+                  (state #\} "object member" "comma or closing brace")
+                (return)))))
       (expect-char state #\})
       (let ((object (if (eq (ps-object-type state) :alist)
                         (nreverse result)
@@ -161,30 +199,44 @@ new) RESULT accumulator, exactly as RECORD-OBJECT-MEMBER does."
     (let ((vector-p (eq (ps-array-type state) :vector)))
       (expect-char state #\[)
       (skip-whitespace state)
-      (let ((elements (when vector-p
-                        (make-array 0 :adjustable t :fill-pointer 0)))
+      (let ((elements nil)
+            (chunks nil)
+            (chunk nil)
+            (chunk-position 0)
             (count 0)
+            (max-elements (ps-max-array-elements state))
             (saved-path (ps-path state))
-            ;; One reused cons instead of WITH-PARSER-PATH's fresh cons per
-            ;; element: the error path only ever reads (PS-PATH STATE)
-            ;; synchronously and PARSE-ERROR-HERE copies it, so mutating this
-            ;; frame's index between elements is safe and saves an allocation
-            ;; per element -- the difference between O(n) and zero path conses
-            ;; for a million-element array.
+            ;; One reused cons instead of WITH-PARSER-PATH per element.
             (path-frame nil))
         (unless (eql (ps-peek state) #\])
           (setf path-frame (cons 0 saved-path))
           (unwind-protect
                (loop
-                 (when (>= count (ps-max-array-elements state))
+                 (when (>= count max-elements)
                    (parse-error-here state "fewer array elements"))
-                 (skip-whitespace state)
                  (setf (car path-frame) count
                        (ps-path state) path-frame)
-                 (let ((value (parse-value state)))
+                 (let ((value (parse-value-at-current state)))
                    (setf (ps-path state) saved-path)
                    (if vector-p
-                       (vector-push-extend value elements)
+                       (if chunk
+                           (progn
+                             (when (= chunk-position (length chunk))
+                               (push chunk chunks)
+                               (setf chunk (make-array 256)
+                                     chunk-position 0))
+                             (setf (svref chunk chunk-position) value)
+                             (incf chunk-position))
+                           (if (< count 256)
+                               (push value elements)
+                               (progn
+                                 (setf chunk (make-array 512))
+                                 (loop for prior in elements
+                                       for index downfrom 255
+                                       do (setf (svref chunk index) prior))
+                                 (setf elements nil
+                                       chunk-position 257
+                                       (svref chunk 256) value))))
                        (push value elements)))
                  (incf count)
                  (consume-separator-or-finish
@@ -192,9 +244,24 @@ new) RESULT accumulator, exactly as RECORD-OBJECT-MEMBER does."
                    (return)))
             (setf (ps-path state) saved-path)))
         (expect-char state #\])
-        (let ((array (if vector-p
-                         (coerce elements 'simple-vector)
-                         (nreverse elements))))
+        (let ((array
+                (if vector-p
+                    (if chunk
+                        (if (and (= count 512)
+                                 (null chunks)
+                                 (= chunk-position (length chunk)))
+                            chunk
+                            (let ((result (make-array count))
+                                  (offset 0))
+                              (dolist (completed (nreverse chunks))
+                                (replace result completed :start1 offset)
+                                (incf offset (length completed)))
+                              (replace result chunk
+                                       :start1 offset
+                                       :end2 chunk-position)
+                              result))
+                        (coerce (nreverse elements) (quote simple-vector)))
+                    (nreverse elements))))
           (if (ps-array-hook state)
               (with-json-callback (hooked state "ARRAY-HOOK" (ps-array-hook state) array)
                 hooked)

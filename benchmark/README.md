@@ -164,13 +164,15 @@ not constitute a complete JSON conformance suite.
 
 These native rows intentionally retain representation and configuration
 asymmetry. They compare the libraries' configured native work, not identical
-DOM construction semantics.
+DOM construction semantics. Native rows support claims only about these
+configured end-to-end operations.
 
 `canonical` parse rows normalize every result to hash-table objects with string
 keys, vector arrays, `:null`, `:false`, and `t`. Parser options, dynamic
 bindings, and recursive normalization are inside the measured operation.
 Canonical rows therefore compare a common result contract but include
-library-specific normalization cost. There are no canonical stringify rows.
+library-specific normalization cost. They are not parser-core measurements.
+There are no canonical stringify rows.
 
 ### Ordering and samples
 
@@ -186,10 +188,20 @@ timed interval. Results report median, minimum, maximum, and population standard
 deviation for elapsed time, throughput, and bytes consed. Allocation data comes
 from `sb-ext:get-bytes-consed`.
 
+Raw sample rows are emitted in actual round and permutation order, before the
+aggregate result rows. `order_index` is zero-based, and `elapsed_ticks` is
+converted to `wall_seconds` using the recorded `timer_units_per_second`:
+
+```text
+record  phase  round  round_seed  order_index  case_id  library  version
+dom  api  mode  operation  workload  input_bytes  elapsed_ticks
+wall_seconds  throughput_mib_s  consed_bytes
+```
+
 ### Self-contained TSV provenance
 
 The competitor TSV starts with `meta` rows under the header `record`, `key`,
-`value`. The exact metadata keys are:
+`value`. Its `schema_version` is `3`. The exact metadata keys are:
 
 - schema: `schema`, `schema_version`;
 - run time: `run_utc`;
@@ -199,15 +211,26 @@ The competitor TSV starts with `meta` rows under the header `record`, `key`,
 - Lisp: `lisp_implementation`, `lisp_version`;
 - settings: `seed`, `operations`, `warmup_rounds`, `sample_rounds`,
   `timer_units_per_second`, `allocation_counter`; and
-- source hashes: `sha256:benchmark/competitors.lisp`,
+- source hashes: `sha256:cl-json-kit.asd`, `sha256:src/package.lisp`,
+  `sha256:src/data.lisp`, `sha256:src/reader-macros.lisp`,
+  `sha256:src/writer-macros.lisp`, `sha256:src/conditions.lisp`,
+  `sha256:src/parser-state.lisp`, `sha256:src/reader-strings.lisp`,
+  `sha256:src/reader-numbers.lisp`, `sha256:src/reader-collections.lisp`,
+  `sha256:src/reader.lisp`, `sha256:src/reader-stream.lisp`,
+  `sha256:src/writer-state.lisp`, `sha256:src/writer-scalars.lisp`,
+  `sha256:src/writer-collections.lisp`, `sha256:src/writer.lisp`,
+  `sha256:src/conversion.lisp`, `sha256:benchmark/competitors.lisp`,
   `sha256:benchmark/run.lisp`, `sha256:benchmark/README.md`,
-  `sha256:flake.nix`, `sha256:flake.lock`.
+  `sha256:flake.nix`, and `sha256:flake.lock`.
 
 When discovery succeeds, `nixpkgs_lock` identifies the locked nixpkgs node
 from `flake.lock` and the source hash keys contain SHA-256 digests. A failed
-discovery is recorded as `unknown`. Together with the host, SBCL, settings,
-and actual order records, these rows keep the provenance needed to interpret
-a result in the TSV itself.
+discovery is recorded as `unknown`; in particular, a failed Git status command
+is never reported as a clean working tree. Hashing both `cl-json-kit.asd` and
+the production component files identifies the exact system definition and
+source contents used by the checkout. Together with the host, SBCL, settings,
+raw samples, and actual order records, these rows keep the provenance needed to
+interpret a result in the TSV itself.
 
 Order rows use:
 
@@ -232,6 +255,8 @@ the JSON input length.
 
 These measurements support comparisons only for the recorded corpus, operation
 and mode, pinned source state, SBCL version, settings, execution order, and
-host. They do not establish that any implementation is universally the
-"world's fastest" JSON library. Publish a claim only with the TSV artifact and
-scope it to the exact workload and environment recorded there.
+host. Canonical parse rows support common-result-contract comparisons, including
+normalization overhead. Native rows support configured end-to-end comparisons
+only. Neither establishes parser-core performance or that any implementation is
+universally the "world's fastest" JSON library. Publish a claim only with the
+TSV artifact and scope it to the exact workload and environment recorded there.
