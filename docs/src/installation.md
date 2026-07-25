@@ -1,7 +1,7 @@
 # Installation
 
 `cl-json-kit` has **no external Common Lisp runtime dependencies**. Only the
-test system additionally uses [`cl-weave`](https://github.com/takeokunn/cl-weave).
+test system additionally uses [`cl-weave`](https://github.com/nerima-lisp/cl-weave).
 
 ## With Nix
 

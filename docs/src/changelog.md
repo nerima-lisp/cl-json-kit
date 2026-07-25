@@ -5,6 +5,14 @@ All notable changes to this project are documented here. This page mirrors
 at the repository root, which remains the source of truth. Releases are also
 listed on the [GitHub releases page](https://github.com/nerima-lisp/cl-json-kit/releases).
 
+## [Unreleased]
+
+### Changed
+
+- Bumped the `cl-weave` test dependency from v0.10.0 to v1.0.0 (`flake.lock`
+  refreshed accordingly). Purely additive on `cl-weave`'s side (new
+  journal/replay/soft-assertion API); no test changes required.
+
 ## [0.3.0] - 2026-07-25
 
 No public API or observable behavior changed in this release; it adds
