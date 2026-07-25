@@ -18,6 +18,10 @@
       ((vector (gen-vector (gen-integer :min -1000 :max 1000) :max-length 8)))
     (expect vector :to-round-trip))
 
+  (it-property "arbitrary nested JSON values (objects, arrays, and every scalar) round-trip"
+      ((value (gen-json-value)))
+    (expect value :to-round-trip))
+
   (it-property "parse-prefix reports the exact consumed length of an integer prefix"
       ((n (gen-integer :min 0 :max 1000000)))
     (let ((text (format nil "~D tail" n)))

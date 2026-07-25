@@ -10,7 +10,10 @@
    ;; Custom matcher definition
    #:defmatcher
    ;; Property generators
-   #:gen-integer #:gen-string #:gen-vector #:gen-list)
+   #:gen-integer #:gen-string #:gen-vector #:gen-list
+   #:gen-one-of #:gen-recursive #:gen-member #:gen-map #:gen-tuple
+   ;; Soft (all-failures-collected) assertions
+   #:with-soft-assertions)
   (:export #:run-tests))
 
 (in-package #:cl-json-kit/test)

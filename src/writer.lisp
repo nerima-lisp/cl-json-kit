@@ -13,17 +13,17 @@ output stream, signalling a serialization error otherwise."
             ((null designator) *standard-output*)
             ((eq designator t) *terminal-io*)
             ((streamp designator) designator)
-            (t (error 'json-serialization-error
-                      :message "STREAM must be an output stream designator")))))
+            (t (error (bounded-json-serialization-error
+                       :message "STREAM must be an output stream designator"))))))
     (unless (open-stream-p stream)
-      (error 'json-serialization-error :message "STREAM must designate an open stream"))
+      (error (bounded-json-serialization-error :message "STREAM must designate an open stream")))
     (unless (output-stream-p stream)
-      (error 'json-serialization-error :message "STREAM must designate an output stream"))
+      (error (bounded-json-serialization-error :message "STREAM must designate an output stream")))
     (multiple-value-bind (character-stream-p certain-p)
         (subtypep (stream-element-type stream) 'character)
       (unless (and certain-p character-stream-p)
-        (error 'json-serialization-error
-               :message "STREAM must designate a character output stream")))
+        (error (bounded-json-serialization-error
+                :message "STREAM must designate a character output stream"))))
     stream))
 
 (defun write-json (value stream

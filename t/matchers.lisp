@@ -54,6 +54,34 @@ EXPECTED operand."
 (defun gen-json-integer ()
   (gen-integer :min -1000000 :max 1000000))
 
+;;; A short alphanumeric key alphabet, distinct from +ESCAPE-STRESS-ALPHABET+:
+;;; GEN-JSON-VALUE below needs many distinct, unremarkable object keys, not
+;;; escape-heavy ones (GEN-JSON-STRING already covers escaping for values).
+(defun gen-json-key ()
+  (gen-string :alphabet "abcdefghij" :min-length 1 :max-length 5))
+
+(defun gen-json-scalar ()
+  "A generator for one JSON leaf value: an integer, an escape-stressed string,
+or one of the three JSON literals (true/false/null)."
+  (gen-one-of (gen-json-integer)
+              (gen-json-string)
+              (gen-member (list t +json-false+ +json-null+))))
+
+(defun gen-json-value (&key (max-depth 3))
+  "A generator for arbitrary JSON-shaped Lisp values: scalars (see
+GEN-JSON-SCALAR) nested inside vectors and hash-tables up to MAX-DEPTH deep."
+  (gen-recursive
+   (gen-json-scalar)
+   (lambda (self)
+     (gen-one-of
+      (gen-vector self :max-length 4)
+      (gen-map (lambda (pairs)
+                 (let ((table (make-hash-table :test #'equal)))
+                   (dolist (pair pairs table)
+                     (setf (gethash (first pair) table) (second pair)))))
+               (gen-list (gen-tuple (gen-json-key) self) :max-length 4))))
+   :max-depth max-depth))
+
 ;;; A named number decoder, used to prove fbound symbols work as callback
 ;;; designators (not only anonymous functions).
 (defun symbol-number-decoder (token integer-p)

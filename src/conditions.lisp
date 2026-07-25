@@ -98,14 +98,19 @@ small nonnegative index or an escaped string, cycle-safe."
              (json-parse-error-path condition)
              (json-parse-error-expected condition)))))
 
-(defmethod initialize-instance :after ((condition json-parse-error) &key)
-  ;; Bound and escape every attacker-influenced slot exactly once, at
-  ;; construction, so downstream reporting can treat them as already-safe.
-  (with-slots (context text path expected) condition
-    (setf context (safe-diagnostic-snippet context)
-          text (safe-diagnostic-snippet text)
-          path (bounded-diagnostic-path path)
-          expected (bounded-expected-value expected))))
+(defun bounded-json-parse-error (&key position line column path expected context text)
+  "Construct a JSON-PARSE-ERROR with every attacker-influenced slot (PATH,
+EXPECTED, CONTEXT, TEXT) bounded and escaped exactly once.  Common Lisp does
+not guarantee that a condition class runs INITIALIZE-INSTANCE (SBCL's
+DEFINE-CONDITION classes do not), so every JSON-PARSE-ERROR call site
+constructs its condition here rather than relying on an :AFTER method that
+would silently never run."
+  (make-condition 'json-parse-error
+                  :position position :line line :column column
+                  :path (bounded-diagnostic-path path)
+                  :expected (bounded-expected-value expected)
+                  :context (safe-diagnostic-snippet context)
+                  :text (safe-diagnostic-snippet text)))
 
 (defun json-parse-error-text (condition)
   "The bounded snippet of the input text captured when CONDITION was signalled."
@@ -126,7 +131,10 @@ small nonnegative index or an escaped string, cycle-safe."
            (format stream "JSON serialization error at ~S: ~A" path message)
            (format stream "JSON serialization error: ~A" message))))))
 
-(defmethod initialize-instance :after ((condition json-serialization-error) &key)
-  (with-slots (message path) condition
-    (setf message (safe-diagnostic-snippet message)
-          path (bounded-diagnostic-path path))))
+(defun bounded-json-serialization-error (&key message path)
+  "Construct a JSON-SERIALIZATION-ERROR with MESSAGE and PATH bounded and
+escaped exactly once -- see BOUNDED-JSON-PARSE-ERROR for why this cannot be an
+INITIALIZE-INSTANCE :AFTER method."
+  (make-condition 'json-serialization-error
+                  :message (safe-diagnostic-snippet message)
+                  :path (bounded-diagnostic-path path)))

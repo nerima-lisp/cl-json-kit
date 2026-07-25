@@ -7,11 +7,31 @@ listed on the [GitHub releases page](https://github.com/nerima-lisp/cl-json-kit/
 
 ## [Unreleased]
 
+### Fixed
+
+- `json-parse-error` and `json-serialization-error` relied on an
+  `initialize-instance :after` method to bound and escape
+  attacker-influenced slots (`:context`, `:expected`, `:path`, `:message`)
+  exactly once, at construction. SBCL's `define-condition` classes are not
+  `standard-object`s and never dispatch through CLOS's `initialize-instance`
+  protocol, so that method silently never ran: a caller-supplied `:context`
+  string (or an oversized object key embedded in a serialization message)
+  reached the condition completely unbounded and unescaped. Every
+  construction site now goes through explicit `bounded-json-parse-error` /
+  `bounded-json-serialization-error` constructor functions instead.
+
 ### Changed
 
 - Bumped the `cl-weave` test dependency from v0.10.0 to v1.0.0 (`flake.lock`
-  refreshed accordingly). Purely additive on `cl-weave`'s side (new
-  journal/replay/soft-assertion API); no test changes required.
+  refreshed accordingly); required by `with-soft-assertions` below, which
+  v0.10.0 does not export.
+- Split `reader-test.lisp` and `writer-test.lisp` into 13 per-feature test
+  files along their existing `describe`-block boundaries.
+- Test suite adopts previously-unused `cl-weave` features: a
+  `gen-recursive`-built arbitrary-nested-JSON generator backs a new
+  round-trip property test, and `with-soft-assertions` collects every
+  failure in a multi-field diagnostic assertion instead of stopping at the
+  first.
 - Internal readability pass over `src/`, all behavior-preserving: shared a
   single `emit-object-member` between hash-table and ordered-object
   serialization; reused `data.lisp`'s number-grammar vocabulary instead of

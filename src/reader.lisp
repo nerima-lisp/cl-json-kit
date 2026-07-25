@@ -11,9 +11,10 @@
   "Signal a parse error unless TIMEOUT-SECONDS is NIL or a non-negative real."
   (unless (or (null timeout-seconds)
               (and (realp timeout-seconds) (not (minusp timeout-seconds))))
-    (error 'json-parse-error :position 0 :line 1 :column 1 :path nil
-           :expected "TIMEOUT-SECONDS to be NIL or a non-negative real"
-           :context context :text (safe-diagnostic-snippet text))))
+    (error (bounded-json-parse-error
+            :position 0 :line 1 :column 1 :path nil
+            :expected "TIMEOUT-SECONDS to be NIL or a non-negative real"
+            :context context :text text))))
 
 ;;; ---------------------------------------------------------------------
 ;;; Option plumbing
@@ -21,10 +22,10 @@
 (defun parser-option-error (string position context expected)
   "Report a bad PARSE/PARSE-PREFIX option as a located JSON-PARSE-ERROR."
   (multiple-value-bind (line column) (parse-error-location string position)
-    (error 'json-parse-error
-           :position position :line line :column column :path nil
-           :expected expected :context context
-           :text (safe-diagnostic-snippet string))))
+    (error (bounded-json-parse-error
+            :position position :line line :column column :path nil
+            :expected expected :context context
+            :text string))))
 
 (defun resolve-parser-callback (callback name string position context)
   "Coerce a callback designator (NIL, a function, or an fbound symbol) into a
