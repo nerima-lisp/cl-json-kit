@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-25
+
+The first stable release. The public API does not change here; what changes is
+that it is now a promise. From this release on the exported surface of the
+`json-kit` package and its documented behavior follow
+[Semantic Versioning](https://semver.org/), as stated in
+[`docs/src/compatibility.md`](docs/src/compatibility.md) — and both halves of
+that promise are enforced by the test suite rather than by intent: the export
+list and its docstrings are asserted by `t/public-api-test.lisp`, and RFC 8259
+conformance is measured against the vendored JSONTestSuite corpus on every
+build.
+
+One real defect was found and fixed on the way here (float serialization
+depending on ambient state; see *Fixed* below). It is listed as a fix rather
+than a breaking change because it lands in the release that first makes a
+compatibility promise, not after one.
+
 ### Added
 
 - RFC 8259 conformance is now measured and enforced rather than asserted in

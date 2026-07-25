@@ -7,8 +7,78 @@ listed on the [GitHub releases page](https://github.com/nerima-lisp/cl-json-kit/
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-25
+
+The first stable release. The public API does not change here; what changes is
+that it is now a promise. From this release on the exported surface of the
+`json-kit` package and its documented behavior follow
+[Semantic Versioning](https://semver.org/), as stated in
+[Compatibility Promise](compatibility.md) — and both halves of
+that promise are enforced by the test suite rather than by intent: the export
+list and its docstrings are asserted by `t/public-api-test.lisp`, and RFC 8259
+conformance is measured against the vendored JSONTestSuite corpus on every
+build.
+
+One real defect was found and fixed on the way here (float serialization
+depending on ambient state; see *Fixed* below). It is listed as a fix rather
+than a breaking change because it lands in the release that first makes a
+compatibility promise, not after one.
+
+### Added
+
+- RFC 8259 conformance is now measured and enforced rather than asserted in
+  prose. The whole parsing corpus of
+  [JSONTestSuite](https://github.com/nst/JSONTestSuite) (MIT) is vendored into
+  `t/rfc8259-conformance-test.lisp` and runs on every build: all 95 `y_`
+  must-accept cases are accepted, all 188 `n_` must-reject cases are rejected,
+  nothing crashes or signals anything but `json-parse-error`, and this
+  library's answer to each of the 35 implementation-defined `i_` cases is
+  pinned so it cannot change silently. The corpus is vendored as data rather
+  than fetched so the check runs offline inside the Nix sandbox, and each case
+  is stored as ASCII string chunks plus character codes so the file stays pure
+  ASCII and every code point is explicit. The 25 cases whose input is not
+  well-formed UTF-8 are excluded by name: this library's API consumes
+  characters, not octets, so they exercise the external-format layer rather
+  than the reader.
+- `t/public-api-test.lisp` pins the exact set of symbols the `json-kit` package
+  exports, requires a docstring on every one of them, and asserts the package
+  name and absence of nicknames, so the public surface cannot change by
+  accident ahead of a release that promises it is stable.
+- A `docs/src/compatibility.md` page stating the 1.0 compatibility promise:
+  what semantic versioning covers (exported symbols and their documented
+  behavior, option names and defaults, the Lisp/JSON mapping, the condition
+  type signalled for each failure class, the measured RFC 8259 results), what
+  it deliberately does not (internal `json-kit::` symbols, exact error message
+  text, exact float digits, benchmark numbers), the supported implementation,
+  and the deprecation policy for the 1.x line.
+- `nix flake check` now builds the documentation as well. The docs build runs
+  `mkdocs --strict`, so a broken link or a page missing from the nav fails a
+  pull request instead of failing the publish workflow after a merge to main.
+
+### Changed
+
+- Every exported symbol now carries a docstring. `define-condition` and
+  `defstruct` have nowhere to put one on the readers and predicates they
+  generate, so `json-parse-error`'s and `json-serialization-error`'s slot
+  readers, and `json-object-p`, get theirs explicitly; both condition classes
+  and each of their slots gained `:documentation` as well. `documentation` now
+  answers at the REPL for the whole public surface rather than for the parts
+  that happen to be written as `defun`s.
+
 ### Fixed
 
+- Float serialization depended on the calling image's
+  `*read-default-float-format*` rather than on the value alone. Common Lisp's
+  printer appends a type marker (`d`/`f`/`s`/`l`) whenever a float's format
+  differs from that variable, and the writer rewrote the marker to `e`, so the
+  same double serialized as `3.14e0` in a default image and as `3.14` in one
+  whose default had been set to `double-float` — while a single-float came out
+  the other way round. Both forms are valid JSON and read back identically, but
+  which one you got was a property of ambient state, not of the value.
+  `json-float-string` now binds `*read-default-float-format*` to the value's own
+  format, so output is a function of the value: `3.14d0` always serializes as
+  `3.14`, `1.0d308` always as `1.0e308`. The marker rewrite is kept as a
+  fallback for implementations that print one regardless.
 - `json-parse-error` and `json-serialization-error` relied on an
   `initialize-instance :after` method to bound and escape
   attacker-influenced slots (`:context`, `:expected`, `:path`, `:message`)
@@ -51,8 +121,6 @@ listed on the [GitHub releases page](https://github.com/nerima-lisp/cl-json-kit/
   dynamic call trace across the full test suite (zero calls) plus a
   by-construction argument that every fallback case it existed for either
   signals in `scan-number` or turns out to be a float.
-- Removed `do-mantissa-digits`: an orphaned macro with zero call sites,
-  whose docstring referenced function names that no longer exist in `src/`.
 - Removed `read-string-escape`: an orphaned function with zero call sites,
   superseded by `parse-escaped-string-rest`'s own inline escape decoding.
 - Closed further coverage gaps found by a follow-up `sb-cover` audit: EOF
@@ -62,6 +130,8 @@ listed on the [GitHub releases page](https://github.com/nerima-lisp/cl-json-kit/
   `read-json`'s truncated-literal/string/container, non-stream-argument, and
   unrecognised-leading-character paths. `src/` coverage: 92.5% expression
   (3302/3569), 91.85% branch (575/626).
+- Removed `do-mantissa-digits`: an orphaned macro with zero call sites,
+  whose docstring referenced function names that no longer exist in `src/`.
 - Consolidated the NIL/function/fbound-symbol callback-designator coercion
   that `resolve-parser-callback` (reader) and `resolve-number-encoder`
   (writer) each hand-wrote independently into one shared
@@ -75,9 +145,11 @@ performance work.
 
 ### Added
 
-- Full MkDocs (Material) documentation site under `docs/` (this site),
-  built offline via a new `docs` flake package and published to GitHub
-  Pages on push to `main`.
+- Full MkDocs (Material) documentation site under `docs/`, built offline via
+  a new `docs` flake package and published to GitHub Pages on push to
+  `main`. Covers installation, a guided tour of reading/writing, the data
+  model, error handling, resource limits, RFC 8259 conformance notes,
+  recipes, an FAQ, and an API reference.
 - treefmt (nixfmt) formatting gate wired into `nix flake check`, a shared
   `nix-setup` composite GitHub Action, Dependabot coverage for GitHub
   Actions (including the nested composite action), and a scheduled
@@ -107,7 +179,7 @@ internal modernization and performance pass over the 0.1.0 surface.
   `competitors.lisp` compares its string DOM APIs against Jzon, Jonathan,
   JSOWN, and Yason. Both emit machine-readable TSV with full provenance (host,
   SBCL, pinned sources, execution order). The default `nix develop` shell now
-  provides the competitor libraries. See [Benchmarks](benchmarks.md).
+  provides the competitor libraries. See `benchmark/README.md`.
 
 ### Changed
 
@@ -165,11 +237,3 @@ internal modernization and performance pass over the 0.1.0 surface.
 - Ordered object representation via `make-json-object` / `json-object-p` /
   `json-object-members`, preserving member order and duplicate keys, plus
   `alist->json-object` / `json-object->alist` to bridge alists explicitly.
-
-!!! note "`:key-type` was removed after 0.1.0"
-    0.1.0 accepted a `:key-type` option that only ever accepted its own
-    default, `:string` — passing anything else signalled a parser-option
-    error. Later modernization work dropped the vestigial option; since no
-    caller could have passed a different value without erroring, this was not
-    an observable behavior change, and no dedicated changelog entry covers the
-    removal.
