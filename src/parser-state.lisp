@@ -91,11 +91,11 @@ one line break each."
 optionally, what was EXPECTED."
   (multiple-value-bind (line column)
       (parse-error-location (ps-text state) (ps-pos state))
-    (error 'json-parse-error
-           :position (ps-pos state) :line line :column column
-           :path (reverse (ps-path state)) :expected expected
-           :context (ps-context state)
-           :text (safe-diagnostic-snippet (ps-text state)))))
+    (error (bounded-json-parse-error
+            :position (ps-pos state) :line line :column column
+            :path (reverse (ps-path state)) :expected expected
+            :context (ps-context state)
+            :text (ps-text state)))))
 
 (defun whitespace-char-p (character)
   "True for the four characters RFC 8259 allows between tokens."

@@ -21,9 +21,10 @@ PARSE, so every PARSE keyword is accepted here too."
                (let ((text (coerce buffer 'string)))
                  (multiple-value-bind (line column)
                      (parse-error-location text (length text))
-                   (error 'json-parse-error :position (length text) :line line :column column
-                          :path nil :expected expected :context "stream"
-                          :text (safe-diagnostic-snippet text)))))
+                   (error (bounded-json-parse-error
+                           :position (length text) :line line :column column
+                           :path nil :expected expected :context "stream"
+                           :text text)))))
              (peek () (peek-char nil stream nil eof))
              (take ()
                (when (>= (length buffer) max-input-length)

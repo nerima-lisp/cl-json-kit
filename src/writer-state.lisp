@@ -26,9 +26,9 @@
 (defun serialization-error (control &rest arguments)
   "Signal a JSON-SERIALIZATION-ERROR describing the current path and a message
 built from CONTROL and ARGUMENTS."
-  (error 'json-serialization-error
-         :message (apply #'format nil control arguments)
-         :path (reverse *json-serialization-path*)))
+  (error (bounded-json-serialization-error
+          :message (apply #'format nil control arguments)
+          :path (reverse *json-serialization-path*))))
 
 ;;; ---------------------------------------------------------------------
 ;;; Option validation
