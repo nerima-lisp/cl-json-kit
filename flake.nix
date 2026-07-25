@@ -32,6 +32,20 @@
       forAllSystems = nixpkgs.lib.genAttrs systems;
       sourceRegistry = "${cl-weave}//:${self}//";
 
+      # Single source of truth for the package version: the `:version` form in
+      # cl-json-kit.asd. A release only ever edits the .asd file and every Nix
+      # package (default + docs) follows automatically. Nix regexes are
+      # whole-string anchored and `.` never spans newlines, so the version is
+      # extracted line-by-line rather than with one multi-line match.
+      version =
+        let
+          lines = nixpkgs.lib.splitString "\n" (builtins.readFile ./cl-json-kit.asd);
+          versionLine = builtins.head (
+            builtins.filter (line: builtins.match "[[:space:]]*:version \"[^\"]*\"" line != null) lines
+          );
+        in
+        builtins.head (builtins.match "[[:space:]]*:version \"([^\"]*)\"" versionLine);
+
       # treefmt drives `nix fmt` and the `checks.<system>.formatting` gate.
       # Scope is Nix only: nixfmt (RFC-style) is a zero-footgun, low-diff
       # formatter, whereas YAML formatters mangle the GitHub Actions `on:`
@@ -54,7 +68,7 @@
         rec {
           cl-json-kit = pkgs.sbcl.buildASDFSystem {
             pname = "cl-json-kit";
-            version = "0.3.0";
+            inherit version;
             src = self;
             systems = [ "cl-json-kit" ];
           };
@@ -66,7 +80,7 @@
           # promotes broken links and unlisted pages to build failures.
           docs = pkgs.stdenvNoCC.mkDerivation {
             pname = "cl-json-kit-docs";
-            version = "0.3.0";
+            inherit version;
             src = pkgs.lib.fileset.toSource {
               root = ./docs;
               fileset = pkgs.lib.fileset.unions [
