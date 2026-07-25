@@ -6,6 +6,18 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Float serialization depended on the calling image's
+  `*read-default-float-format*` rather than on the value alone. Common Lisp's
+  printer appends a type marker (`d`/`f`/`s`/`l`) whenever a float's format
+  differs from that variable, and the writer rewrote the marker to `e`, so the
+  same double serialized as `3.14e0` in a default image and as `3.14` in one
+  whose default had been set to `double-float` — while a single-float came out
+  the other way round. Both forms are valid JSON and read back identically, but
+  which one you got was a property of ambient state, not of the value.
+  `json-float-string` now binds `*read-default-float-format*` to the value's own
+  format, so output is a function of the value: `3.14d0` always serializes as
+  `3.14`, `1.0d308` always as `1.0e308`. The marker rewrite is kept as a
+  fallback for implementations that print one regardless.
 - `json-parse-error` and `json-serialization-error` relied on an
   `initialize-instance :after` method to bound and escape
   attacker-influenced slots (`:context`, `:expected`, `:path`, `:message`)

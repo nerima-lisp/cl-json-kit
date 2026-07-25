@@ -48,16 +48,35 @@ of a user NUMBER-ENCODER."
        (handler-case (progn (integer-decode-float value) t)
          (error () nil))))
 
+(defun float-format-name (value)
+  "The type name naming VALUE's own float format, for binding
+*READ-DEFAULT-FLOAT-FORMAT* around printing.  DOUBLE-FLOAT and SINGLE-FLOAT are
+tested first so that implementations where SHORT-FLOAT or LONG-FLOAT is merely a
+synonym for one of them (SBCL) still yield the canonical name."
+  (etypecase value
+    (double-float 'double-float)
+    (single-float 'single-float)
+    (short-float 'short-float)
+    (long-float 'long-float)))
+
 (defun json-float-string (value)
   "A JSON representation of the finite float VALUE that reads back identically,
-with the Lisp exponent marker (d/f/s/l) normalised to `e' and signed zero
-preserved."
+with signed zero preserved.
+
+The printer appends a Lisp exponent marker (d/f/s/l) whenever VALUE's format
+differs from *READ-DEFAULT-FLOAT-FORMAT*, which would otherwise make this
+library's output depend on ambient state of the calling image rather than on
+VALUE alone: the same double serializes as \"3.14e0\" under the default
+SINGLE-FLOAT setting and as \"3.14\" under DOUBLE-FLOAT.  Binding the variable to
+VALUE's own format makes the output a function of VALUE.  The marker rewrite
+below is kept as a fallback for implementations that print one regardless."
   (unless (finite-float-p value)
     (serialization-error "JSON numbers cannot represent NaN or infinity"))
   (if (zerop value)
       (if (minusp (float-sign value)) "-0.0" "0.0")
       (let* ((*print-readably* t)
              (*print-pretty* nil)
+             (*read-default-float-format* (float-format-name value))
              (printed (write-to-string value))
              (marker (position-if
                       (lambda (character) (find character "dDfFsSlL" :test #'char=))
