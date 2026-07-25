@@ -1,6 +1,9 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to this project are documented here. This page mirrors
+[`CHANGELOG.md`](https://github.com/nerima-lisp/cl-json-kit/blob/main/CHANGELOG.md)
+at the repository root, which remains the source of truth. Releases are also
+listed on the [GitHub releases page](https://github.com/nerima-lisp/cl-json-kit/releases).
 
 ## [0.2.0] - 2026-07-24
 
@@ -14,7 +17,7 @@ internal modernization and performance pass over the 0.1.0 surface.
   `competitors.lisp` compares its string DOM APIs against Jzon, Jonathan,
   JSOWN, and Yason. Both emit machine-readable TSV with full provenance (host,
   SBCL, pinned sources, execution order). The default `nix develop` shell now
-  provides the competitor libraries. See `benchmark/README.md`.
+  provides the competitor libraries. See [Benchmarks](benchmarks.md).
 
 ### Changed
 
@@ -72,3 +75,11 @@ internal modernization and performance pass over the 0.1.0 surface.
 - Ordered object representation via `make-json-object` / `json-object-p` /
   `json-object-members`, preserving member order and duplicate keys, plus
   `alist->json-object` / `json-object->alist` to bridge alists explicitly.
+
+!!! note "`:key-type` was removed after 0.1.0"
+    0.1.0 accepted a `:key-type` option that only ever accepted its own
+    default, `:string` — passing anything else signalled a parser-option
+    error. Later modernization work dropped the vestigial option; since no
+    caller could have passed a different value without erroring, this was not
+    an observable behavior change, and no dedicated changelog entry covers the
+    removal.

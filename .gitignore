@@ -8,6 +8,9 @@
 /result
 /result-*
 
+# MkDocs rendered site (docs/mkdocs.yml writes to ./site)
+/site/
+
 # Editor/tool scratch output
 tmp/
 tmp-debug/

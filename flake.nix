@@ -59,6 +59,34 @@
             systems = [ "cl-json-kit" ];
           };
           default = cl-json-kit;
+
+          # Rendered documentation site (Material for MkDocs).
+          # Build fully offline: Material for MkDocs bundles all of its assets,
+          # so no network access is required inside the Nix sandbox. --strict
+          # promotes broken links and unlisted pages to build failures.
+          docs = pkgs.stdenvNoCC.mkDerivation {
+            pname = "cl-json-kit-docs";
+            version = "0.2.0";
+            src = pkgs.lib.fileset.toSource {
+              root = ./docs;
+              fileset = pkgs.lib.fileset.unions [
+                ./docs/mkdocs.yml
+                ./docs/src
+              ];
+            };
+            nativeBuildInputs = [ pkgs.python3Packages.mkdocs-material ];
+            buildPhase = ''
+              runHook preBuild
+              mkdocs build --strict --config-file mkdocs.yml --site-dir "$out"
+              runHook postBuild
+            '';
+            dontInstall = true;
+            meta = {
+              description = "Rendered MkDocs (Material) documentation for cl-json-kit";
+              homepage = "https://github.com/nerima-lisp/cl-json-kit";
+              license = pkgs.lib.licenses.mit;
+            };
+          };
         }
       );
 

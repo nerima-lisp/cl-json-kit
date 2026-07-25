@@ -1,6 +1,7 @@
 # cl-json-kit
 
 [![CI](https://github.com/nerima-lisp/cl-json-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/nerima-lisp/cl-json-kit/actions/workflows/ci.yml)
+[![Publish documentation](https://github.com/nerima-lisp/cl-json-kit/actions/workflows/docs.yml/badge.svg)](https://github.com/nerima-lisp/cl-json-kit/actions/workflows/docs.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 `cl-json-kit` is a dependency-free JSON reader and writer for Common Lisp. It
@@ -11,6 +12,11 @@ diagnostics.
 The core reader and writer use portable Common Lisp. On SBCL,
 `:timeout-seconds` additionally uses `sb-ext:with-timeout`; other
 implementations accept the option but parse without a wall-clock timeout.
+
+📖 **Full documentation:** <https://nerima-lisp.github.io/cl-json-kit/> —
+installation, a guided tour of reading/writing, the data model, error handling,
+resource limits, an API reference, and the benchmark harness. The site is built
+with MkDocs (Material) from `docs/`; build it locally with `nix build .#docs`.
 
 ## Why another JSON library?
 
