@@ -54,6 +54,12 @@ compatibility promise, not after one.
 
 ### Changed
 
+- The README is now an entry point rather than a second copy of the reference
+  documentation: what the library is, how to install it, one example, the
+  mapping table, and links into the documentation site. It had grown to 466
+  lines duplicating the site's option lists, limits table, conversion helpers,
+  and diagnostics, which is exactly the kind of duplication that drifts out of
+  date once a release starts making promises about behavior.
 - Every exported symbol now carries a docstring. `define-condition` and
   `defstruct` have nowhere to put one on the readers and predicates they
   generate, so `json-parse-error`'s and `json-serialization-error`'s slot
