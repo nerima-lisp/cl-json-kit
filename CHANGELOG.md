@@ -4,6 +4,47 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- RFC 8259 conformance is now measured and enforced rather than asserted in
+  prose. The whole parsing corpus of
+  [JSONTestSuite](https://github.com/nst/JSONTestSuite) (MIT) is vendored into
+  `t/rfc8259-conformance-test.lisp` and runs on every build: all 95 `y_`
+  must-accept cases are accepted, all 188 `n_` must-reject cases are rejected,
+  nothing crashes or signals anything but `json-parse-error`, and this
+  library's answer to each of the 35 implementation-defined `i_` cases is
+  pinned so it cannot change silently. The corpus is vendored as data rather
+  than fetched so the check runs offline inside the Nix sandbox, and each case
+  is stored as ASCII string chunks plus character codes so the file stays pure
+  ASCII and every code point is explicit. The 25 cases whose input is not
+  well-formed UTF-8 are excluded by name: this library's API consumes
+  characters, not octets, so they exercise the external-format layer rather
+  than the reader.
+- `t/public-api-test.lisp` pins the exact set of symbols the `json-kit` package
+  exports, requires a docstring on every one of them, and asserts the package
+  name and absence of nicknames, so the public surface cannot change by
+  accident ahead of a release that promises it is stable.
+- A `docs/src/compatibility.md` page stating the 1.0 compatibility promise:
+  what semantic versioning covers (exported symbols and their documented
+  behavior, option names and defaults, the Lisp/JSON mapping, the condition
+  type signalled for each failure class, the measured RFC 8259 results), what
+  it deliberately does not (internal `json-kit::` symbols, exact error message
+  text, exact float digits, benchmark numbers), the supported implementation,
+  and the deprecation policy for the 1.x line.
+- `nix flake check` now builds the documentation as well. The docs build runs
+  `mkdocs --strict`, so a broken link or a page missing from the nav fails a
+  pull request instead of failing the publish workflow after a merge to main.
+
+### Changed
+
+- Every exported symbol now carries a docstring. `define-condition` and
+  `defstruct` have nowhere to put one on the readers and predicates they
+  generate, so `json-parse-error`'s and `json-serialization-error`'s slot
+  readers, and `json-object-p`, get theirs explicitly; both condition classes
+  and each of their slots gained `:documentation` as well. `documentation` now
+  answers at the REPL for the whole public surface rather than for the parts
+  that happen to be written as `defun`s.
+
 ### Fixed
 
 - Float serialization depended on the calling image's

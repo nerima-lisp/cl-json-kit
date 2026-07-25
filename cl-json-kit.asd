@@ -47,6 +47,7 @@ correctly, and parsing can be bounded with a timeout."
   :serial t
   :components ((:file "package")
                (:file "matchers")
+               (:file "public-api-test")
                (:file "conditions-test")
                (:file "reader-scalars-test")
                (:file "reader-strings-test")
@@ -61,7 +62,8 @@ correctly, and parsing can be bounded with a timeout."
                (:file "writer-limits-test")
                (:file "writer-streams-test")
                (:file "writer-alist-test")
-               (:file "property-test"))
+               (:file "property-test")
+               (:file "rfc8259-conformance-test"))
   :perform (test-op (operation component)
              (declare (ignore operation component))
              (unless (funcall (symbol-function (find-symbol "RUN-TESTS" "CL-JSON-KIT/TEST")))

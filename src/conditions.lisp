@@ -81,13 +81,25 @@ small nonnegative index or an escaped string, cycle-safe."
 ;;; Parse errors
 ;;; ---------------------------------------------------------------------
 (define-condition json-parse-error (error)
-  ((position :initarg :position :reader json-parse-error-position)
-   (line :initarg :line :initform 1 :reader json-parse-error-line)
-   (column :initarg :column :initform 1 :reader json-parse-error-column)
-   (path :initarg :path :initform nil :reader json-parse-error-path)
-   (expected :initarg :expected :initform nil :reader json-parse-error-expected)
-   (context :initarg :context :initform "JSON" :reader json-parse-error-context)
-   (text :initarg :text :initform ""))
+  ((position :initarg :position :reader json-parse-error-position
+             :documentation "Zero-based character index of the offending input.")
+   (line :initarg :line :initform 1 :reader json-parse-error-line
+         :documentation "One-based line number of the offending input.")
+   (column :initarg :column :initform 1 :reader json-parse-error-column
+           :documentation "One-based column number of the offending input.")
+   (path :initarg :path :initform nil :reader json-parse-error-path
+         :documentation "Bounded location within the value: object keys and array indices.")
+   (expected :initarg :expected :initform nil :reader json-parse-error-expected
+             :documentation "Bounded description of what the reader required instead.")
+   (context :initarg :context :initform "JSON" :reader json-parse-error-context
+            :documentation "Bounded caller-supplied label naming the input being parsed.")
+   (text :initarg :text :initform ""
+         :documentation "Bounded snippet of the input, read via JSON-PARSE-ERROR-TEXT."))
+  (:documentation
+   "Signalled for any input the reader refuses, and the only condition PARSE,
+PARSE-PREFIX, and READ-JSON signal for malformed JSON.  Every slot that can
+carry attacker-influenced data is truncated and control-character-escaped before
+it is stored, so reporting the condition cannot itself become an attack surface.")
   (:report
    (lambda (condition stream)
      (format stream "~A parse error at line ~D, column ~D (position ~D)~@[ at ~S~]~@[: expected ~A~]"
@@ -116,13 +128,42 @@ would silently never run."
   "The bounded snippet of the input text captured when CONDITION was signalled."
   (slot-value condition 'text))
 
+;;; DEFINE-CONDITION generates the readers above but has nowhere to put a
+;;; docstring on them, so they are attached here: the whole exported surface
+;;; answers DOCUMENTATION at the REPL, not just the parts written as DEFUNs.
+(loop for (name . text)
+        in '((json-parse-error-position
+              . "Zero-based character index in the input where parsing failed.")
+             (json-parse-error-line
+              . "One-based line number in the input where parsing failed.")
+             (json-parse-error-column
+              . "One-based column number in the input where parsing failed.")
+             (json-parse-error-path
+              . "Bounded path to the failure as a list of object keys (strings) and
+array indices (integers), outermost first, or NIL at the top level.")
+             (json-parse-error-expected
+              . "Bounded description of what the reader required at the failure point,
+or NIL when it has nothing more specific to report.")
+             (json-parse-error-context
+              . "Bounded label naming the input, from PARSE's :CONTEXT argument;
+\"JSON\" when the caller supplied none."))
+      do (setf (documentation name 'function) text))
+
 ;;; ---------------------------------------------------------------------
 ;;; Serialization errors
 ;;; ---------------------------------------------------------------------
 (define-condition json-serialization-error (error)
   ((message :initarg :message :initform "JSON serialization failed"
-            :reader json-serialization-error-message)
-   (path :initarg :path :initform nil :reader json-serialization-error-path))
+            :reader json-serialization-error-message
+            :documentation "Bounded description of why serialization failed.")
+   (path :initarg :path :initform nil :reader json-serialization-error-path
+         :documentation "Bounded location of the offending value within the input value."))
+  (:documentation
+   "Signalled for any value the writer refuses, and the only condition STRINGIFY
+and WRITE-JSON signal: a value of an unsupported type, a non-finite float, a
+ratio with no terminating decimal expansion, a raw surrogate character, a
+circular structure, or output exceeding a configured bound.  Both slots are
+truncated and escaped before they are stored.")
   (:report
    (lambda (condition stream)
      (let ((message (json-serialization-error-message condition))
@@ -138,3 +179,11 @@ INITIALIZE-INSTANCE :AFTER method."
   (make-condition 'json-serialization-error
                   :message (safe-diagnostic-snippet message)
                   :path (bounded-diagnostic-path path)))
+
+(loop for (name . text)
+        in '((json-serialization-error-message
+              . "Bounded description of why the value could not be serialized.")
+             (json-serialization-error-path
+              . "Bounded path to the offending value as a list of object keys (strings)
+and array indices (integers), outermost first, or NIL at the top level."))
+      do (setf (documentation name 'function) text))
