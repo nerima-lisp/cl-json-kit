@@ -18,25 +18,35 @@
 ;;; ---------------------------------------------------------------------
 ;;; Token analysis
 ;;; ---------------------------------------------------------------------
+(defun scan-coefficient-digits (text start end negative-p)
+  "The unsigned integer formed by TEXT[start,end)'s significant digits, skipping
+the sign and decimal point and stopping before any exponent marker.  Shared by
+EXACT-NUMBER-RANGE-VALUE and DECODE-FLOAT-RANGE so both decoders read the same
+coefficient out of one number token."
+  (let ((coefficient 0)
+        (index (if negative-p (1+ start) start)))
+    (loop while (< index end)
+          for character = (char text index)
+          until (member character +json-exponent-markers+)
+          do (unless (char= character #\.)
+               (setf coefficient (+ (* coefficient 10)
+                                    (ascii-json-digit-value character))))
+             (incf index))
+    coefficient))
+
 (defun exact-number-range-value
     (text start end negative-p coefficient-zero-p scale)
   "Return the exact rational value represented by TEXT[start,end)."
-  (let ((coefficient 0)
-        (index (if negative-p (1+ start) start)))
-    (unless coefficient-zero-p
-      (loop while (< index end)
-            for character = (char text index)
-            until (member character +json-exponent-markers+)
-            do (unless (char= character #\.)
-                 (setf coefficient (+ (* coefficient 10)
-                                      (ascii-json-digit-value character))))
-               (incf index)))
-    (let ((magnitude
-            (cond
-              (coefficient-zero-p 0)
-              ((minusp scale) (/ coefficient (expt 10 (- scale))))
-              (t (* coefficient (expt 10 scale))))))
-      (if negative-p (- magnitude) magnitude))))
+  (let* ((coefficient
+           (if coefficient-zero-p
+               0
+               (scan-coefficient-digits text start end negative-p)))
+         (magnitude
+           (cond
+             (coefficient-zero-p 0)
+             ((minusp scale) (/ coefficient (expt 10 (- scale))))
+             (t (* coefficient (expt 10 scale))))))
+    (if negative-p (- magnitude) magnitude)))
 
 ;;; ---------------------------------------------------------------------
 ;;; Scanning and decoding
@@ -153,40 +163,32 @@
                      (round-quotient-even numerator (ash denominator (- shift)))
                      (round-quotient-even (ash numerator shift) denominator))))
         (handler-case
-            (let ((coefficient 0)
-                  (index (if negative-p (1+ start) start)))
-              (loop while (< index end)
-                    for character = (char text index)
-                    until (member character +json-exponent-markers+)
-                    do (unless (char= character #\.)
-                         (setf coefficient (+ (* coefficient 10)
-                                              (ascii-json-digit-value character))))
-                       (incf index))
-              (let* ((power (expt 10 (abs scale)))
-                     (numerator (if (minusp scale) coefficient (* coefficient power)))
-                     (denominator (if (minusp scale) power 1))
-                     (binary-exponent (floor-log2-ratio numerator denominator))
-                     (rounded
-                       (if (< binary-exponent -1022)
-                           (scaled-rounded numerator denominator 1074)
-                           (scaled-rounded numerator denominator (- 52 binary-exponent)))))
-                (cond
-                  ((or (> binary-exponent 1023) (zerop rounded))
-                   (exact-number-range-value text start end negative-p
-                                             coefficient-zero-p scale))
-                  ((< binary-exponent -1022)
-                   (let ((value (scale-float (float rounded 1.0d0) -1074)))
-                     (if negative-p (- value) value)))
-                  (t
-                   (when (= rounded (ash 1 53))
-                     (setf rounded (ash 1 52))
-                     (incf binary-exponent))
-                   (if (> binary-exponent 1023)
-                       (exact-number-range-value text start end negative-p
-                                                 coefficient-zero-p scale)
-                       (let ((value (scale-float (float rounded 1.0d0)
-                                                 (- binary-exponent 52))))
-                         (if negative-p (- value) value)))))))
+            (let* ((coefficient (scan-coefficient-digits text start end negative-p))
+                   (power (expt 10 (abs scale)))
+                   (numerator (if (minusp scale) coefficient (* coefficient power)))
+                   (denominator (if (minusp scale) power 1))
+                   (binary-exponent (floor-log2-ratio numerator denominator))
+                   (rounded
+                     (if (< binary-exponent -1022)
+                         (scaled-rounded numerator denominator 1074)
+                         (scaled-rounded numerator denominator (- 52 binary-exponent)))))
+              (cond
+                ((or (> binary-exponent 1023) (zerop rounded))
+                 (exact-number-range-value text start end negative-p
+                                           coefficient-zero-p scale))
+                ((< binary-exponent -1022)
+                 (let ((value (scale-float (float rounded 1.0d0) -1074)))
+                   (if negative-p (- value) value)))
+                (t
+                 (when (= rounded (ash 1 53))
+                   (setf rounded (ash 1 52))
+                   (incf binary-exponent))
+                 (if (> binary-exponent 1023)
+                     (exact-number-range-value text start end negative-p
+                                               coefficient-zero-p scale)
+                     (let ((value (scale-float (float rounded 1.0d0)
+                                               (- binary-exponent 52))))
+                       (if negative-p (- value) value))))))
           (error ()
             (exact-number-range-value text start end negative-p
                                       coefficient-zero-p scale))))))

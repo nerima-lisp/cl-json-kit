@@ -19,22 +19,20 @@ of a user NUMBER-ENCODER."
          (labels ((current () (and (< index size) (char string index)))
                   (digits ()
                     (let ((start index))
-                      (loop while (and (current)
-                                       (let ((character (current)))
-                                         (and character (char<= #\0 character #\9))))
+                      (loop while (and (current) (ascii-json-digit-p (current)))
                             do (incf index))
                       (> index start))))
            (when (eql (current) #\-) (incf index))
            (cond
              ((eql (current) #\0) (incf index))
-             ((and (current) (find (current) "123456789" :test #'char=)) (digits))
+             ((and (current) (char<= #\1 (current) #\9)) (digits))
              (t (return-from json-number-string-p nil)))
            (when (eql (current) #\.)
              (incf index)
              (unless (digits) (return-from json-number-string-p nil)))
-           (when (and (current) (find (current) "eE" :test #'char=))
+           (when (member (current) +json-exponent-markers+)
              (incf index)
-             (when (and (current) (find (current) "+-" :test #'char=)) (incf index))
+             (when (member (current) +json-sign-characters+) (incf index))
              (unless (digits) (return-from json-number-string-p nil)))
            (= index size)))))
 
@@ -157,6 +155,21 @@ does not terminate or would exceed the output budget."
 ;;; ---------------------------------------------------------------------
 ;;; Strings
 ;;; ---------------------------------------------------------------------
+(defun emit-control-char-escape (character code)
+  "Emit CHARACTER (whose CODE is below #x20) as its JSON escape: the short
+letter form (\\n, \\t, ...) when CHARACTER has one, otherwise a \\u00XX numeric
+escape.  Shared by WRITE-JSON-STRING's buffered and run-flushing branches."
+  (let ((letter (json-escape-letter character)))
+    (if letter
+        (progn (emit-character #\\) (emit-character letter))
+        (progn
+          (reserve-output 6)
+          (write-string "\\u00" *json-output-stream*)
+          (write-char (schar +hex-digits+ (ash code -4))
+                      *json-output-stream*)
+          (write-char (schar +hex-digits+ (logand code #x0f))
+                      *json-output-stream*)))))
+
 (defun write-json-string (string)
   "Serialize STRING as a quoted, escaped JSON string, rejecting raw surrogates.
 Contiguous unescaped characters are flushed as a single WRITE-STRING run and
@@ -199,16 +212,7 @@ costs one write rather than one per character."
                   do (cond
                        ((< code #x20)
                         (flush-buffer)
-                        (let ((letter (json-escape-letter character)))
-                          (if letter
-                              (progn (emit-character #\\) (emit-character letter))
-                              (progn
-                                (reserve-output 6)
-                                (write-string "\\u00" *json-output-stream*)
-                                (write-char (schar "0123456789ABCDEF" (ash code -4))
-                                            *json-output-stream*)
-                                (write-char (schar "0123456789ABCDEF" (logand code #x0f))
-                                            *json-output-stream*)))))
+                        (emit-control-char-escape character code))
                        ((char= character #\")
                         (when (> used (- buffer-size 2))
                           (flush-buffer))
@@ -251,16 +255,7 @@ costs one write rather than one per character."
                   do (cond
                        ((< code #x20)
                         (flush-run index)
-                        (let ((letter (json-escape-letter character)))
-                          (if letter
-                              (progn (emit-character #\\) (emit-character letter))
-                              (progn
-                                (reserve-output 6)
-                                (write-string "\\u00" *json-output-stream*)
-                                (write-char (schar "0123456789ABCDEF" (ash code -4))
-                                            *json-output-stream*)
-                                (write-char (schar "0123456789ABCDEF" (logand code #x0f))
-                                            *json-output-stream*))))
+                        (emit-control-char-escape character code)
                         (setf run-start (1+ index)))
                        ((char= character #\") (flush-run index) (emit-string "\\\"")
                         (setf run-start (1+ index)))

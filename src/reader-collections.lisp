@@ -129,8 +129,6 @@ new) RESULT accumulator, exactly as RECORD-OBJECT-MEMBER does."
   (with-nesting-guard (state)
     (expect-char state #\{)
     (skip-whitespace state)
-    ;; The default HASH-TABLE/:LAST case can overwrite duplicates directly.
-    ;; Keep its member loop free of representation and duplicate-policy dispatch.
     (let* ((fast-last-p (and (eq (ps-object-type state) :hash-table)
                              (eq (ps-duplicate-key-policy state) :last)))
            (key-decoder (when fast-last-p (ps-key-decoder state)))
@@ -143,44 +141,51 @@ new) RESULT accumulator, exactly as RECORD-OBJECT-MEMBER does."
                               (eq (ps-duplicate-key-policy state) :preserve)))
                (make-hash-table :test (function equal))))
            (count 0))
-      (unless (eql (ps-peek state) #\})
-        (if fast-last-p
-            (let* ((saved-path (ps-path state))
-                   (path-frame (cons nil saved-path)))
-              (unwind-protect
-                   (loop
-                     (when (>= count max-members)
-                       (parse-error-here state "fewer object members"))
-                     (incf count)
-                     (unless (eql (ps-peek state) #\")
-                       (parse-error-here state "object key string"))
-                     (let* ((key (parse-json-string state))
-                            (converted-key
-                              (if key-decoder
-                                  (progn
-                                    (setf (car path-frame) key
-                                          (ps-path state) path-frame)
-                                    (prog1 (json-key->lisp-key key state)
-                                      (setf (ps-path state) saved-path)))
-                                  key)))
-                       (skip-whitespace state)
-                       (expect-char state #\:)
-                       (setf (car path-frame) key
-                             (ps-path state) path-frame
-                             (gethash converted-key result) (parse-value state)
-                             (ps-path state) saved-path))
-                     (consume-separator-or-finish
-                         (state #\} "object member" "comma or closing brace")
-                       (return)))
-                (setf (ps-path state) saved-path)))
-            (loop
-              (when (>= count max-members)
-                (parse-error-here state "fewer object members"))
-              (incf count)
-              (setf result (read-object-member state result seen))
-              (consume-separator-or-finish
-                  (state #\} "object member" "comma or closing brace")
-                (return)))))
+      (labels ((parse-fast-last-members ()
+                 ;; The default HASH-TABLE/:LAST case can overwrite duplicates
+                 ;; directly, so this loop stays free of the representation and
+                 ;; duplicate-policy dispatch that READ-OBJECT-MEMBER carries.
+                 (let* ((saved-path (ps-path state))
+                        (path-frame (cons nil saved-path)))
+                   (unwind-protect
+                        (loop
+                          (when (>= count max-members)
+                            (parse-error-here state "fewer object members"))
+                          (incf count)
+                          (unless (eql (ps-peek state) #\")
+                            (parse-error-here state "object key string"))
+                          (let* ((key (parse-json-string state))
+                                 (converted-key
+                                   (if key-decoder
+                                       (progn
+                                         (setf (car path-frame) key
+                                               (ps-path state) path-frame)
+                                         (prog1 (json-key->lisp-key key state)
+                                           (setf (ps-path state) saved-path)))
+                                       key)))
+                            (skip-whitespace state)
+                            (expect-char state #\:)
+                            (setf (car path-frame) key
+                                  (ps-path state) path-frame
+                                  (gethash converted-key result) (parse-value state)
+                                  (ps-path state) saved-path))
+                          (consume-separator-or-finish
+                              (state #\} "object member" "comma or closing brace")
+                            (return)))
+                     (setf (ps-path state) saved-path))))
+               (parse-general-members ()
+                 (loop
+                   (when (>= count max-members)
+                     (parse-error-here state "fewer object members"))
+                   (incf count)
+                   (setf result (read-object-member state result seen))
+                   (consume-separator-or-finish
+                       (state #\} "object member" "comma or closing brace")
+                     (return)))))
+        (unless (eql (ps-peek state) #\})
+          (if fast-last-p
+              (parse-fast-last-members)
+              (parse-general-members))))
       (expect-char state #\})
       (let ((object (if (eq (ps-object-type state) :alist)
                         (nreverse result)
@@ -208,41 +213,45 @@ new) RESULT accumulator, exactly as RECORD-OBJECT-MEMBER does."
             (saved-path (ps-path state))
             ;; One reused cons instead of WITH-PARSER-PATH per element.
             (path-frame nil))
-        (unless (eql (ps-peek state) #\])
-          (setf path-frame (cons 0 saved-path))
-          (unwind-protect
-               (loop
-                 (when (>= count max-elements)
-                   (parse-error-here state "fewer array elements"))
-                 (setf (car path-frame) count
-                       (ps-path state) path-frame)
-                 (let ((value (parse-value-at-current state)))
-                   (setf (ps-path state) saved-path)
+        (labels ((grow-chunk (value)
+                   (when (= chunk-position (length chunk))
+                     (push chunk chunks)
+                     (setf chunk (make-array 256)
+                           chunk-position 0))
+                   (setf (svref chunk chunk-position) value)
+                   (incf chunk-position))
+                 (promote-to-chunk (value)
+                   ;; The 257th vector element: move ELEMENTS into a fresh 512-element CHUNK.
+                   (setf chunk (make-array 512))
+                   (loop for prior in elements
+                         for index downfrom 255
+                         do (setf (svref chunk index) prior))
+                   (setf elements nil
+                         chunk-position 257
+                         (svref chunk 256) value))
+                 (collect-element (value)
                    (if vector-p
-                       (if chunk
-                           (progn
-                             (when (= chunk-position (length chunk))
-                               (push chunk chunks)
-                               (setf chunk (make-array 256)
-                                     chunk-position 0))
-                             (setf (svref chunk chunk-position) value)
-                             (incf chunk-position))
-                           (if (< count 256)
-                               (push value elements)
-                               (progn
-                                 (setf chunk (make-array 512))
-                                 (loop for prior in elements
-                                       for index downfrom 255
-                                       do (setf (svref chunk index) prior))
-                                 (setf elements nil
-                                       chunk-position 257
-                                       (svref chunk 256) value))))
-                       (push value elements)))
-                 (incf count)
-                 (consume-separator-or-finish
-                     (state #\] "array value" "comma or closing bracket")
-                   (return)))
-            (setf (ps-path state) saved-path)))
+                       (cond
+                         (chunk (grow-chunk value))
+                         ((< count 256) (push value elements))
+                         (t (promote-to-chunk value)))
+                       (push value elements))))
+          (unless (eql (ps-peek state) #\])
+            (setf path-frame (cons 0 saved-path))
+            (unwind-protect
+                 (loop
+                   (when (>= count max-elements)
+                     (parse-error-here state "fewer array elements"))
+                   (setf (car path-frame) count
+                         (ps-path state) path-frame)
+                   (let ((value (parse-value-at-current state)))
+                     (setf (ps-path state) saved-path)
+                     (collect-element value))
+                   (incf count)
+                   (consume-separator-or-finish
+                       (state #\] "array value" "comma or closing bracket")
+                     (return)))
+              (setf (ps-path state) saved-path))))
         (expect-char state #\])
         (let ((array
                 (if vector-p
