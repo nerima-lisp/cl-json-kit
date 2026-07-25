@@ -125,7 +125,33 @@
                        (loop repeat size do (write-string "\\\"" stream))
                        (write-char #\" stream))))
       (expect (string= (stringify input :max-output-length nil) expected) :to-be-truthy)
-      (expect (string= (stringify input) expected) :to-be-truthy))))
+      (expect (string= (stringify input) expected) :to-be-truthy)))
+
+  (it "exercises every buffered-path dispatch arm: quote, backslash, control, and plain characters"
+    ;; The single-character-repeated string above only ever takes the buffered
+    ;; branch's quote arm; a mixed string is needed to reach its backslash,
+    ;; control-character, and plain-character arms too.
+    (let* ((unit (concatenate 'string "\"" "\\"
+                              (string (code-char #x00))
+                              (string (code-char #x1f))
+                              "ab"))
+           (input (with-output-to-string (stream)
+                    (loop repeat 24 do (write-string unit stream))))
+           (expected (with-output-to-string (stream)
+                       (write-char #\" stream)
+                       (loop repeat 24
+                             do (write-string "\\\"" stream)
+                                (write-string "\\\\" stream)
+                                (write-string "\\u0000" stream)
+                                (write-string "\\u001F" stream)
+                                (write-string "ab" stream))
+                       (write-char #\" stream))))
+      (expect (string= (stringify input :max-output-length nil) expected) :to-be-truthy)))
+
+  (it "rejects a raw surrogate reached via the buffered path"
+    (let ((input (concatenate 'string (make-string 150 :initial-element #\")
+                              (string (code-char #xd800)))))
+      (signals json-serialization-error (stringify input :max-output-length nil)))))
 
 (describe "bounded dense string escaping"
   (it "keeps quote and backslash escapes atomic"

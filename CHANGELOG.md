@@ -22,6 +22,11 @@ All notable changes to this project will be documented in this file.
 - Bumped the `cl-weave` test dependency from v0.10.0 to v1.0.0 (`flake.lock`
   refreshed accordingly); required by `with-soft-assertions` below, which
   v0.10.0 does not export.
+- `flake.nix`'s Nix packages now derive their version from `cl-json-kit.asd`'s
+  `:version` form at eval time instead of duplicating it as a separate
+  hardcoded string in two places, matching the pattern already used by the
+  sibling `nerima-lisp/cl-weave` flake. Reformatted `cl-json-kit/test`'s
+  dense single-line `:perform` form across multiple lines.
 - Split `reader-test.lisp` and `writer-test.lisp` into 13 per-feature test
   files along their existing `describe`-block boundaries.
 - Test suite adopts previously-unused `cl-weave` features: a
@@ -43,6 +48,15 @@ All notable changes to this project will be documented in this file.
   dynamic call trace across the full test suite (zero calls) plus a
   by-construction argument that every fallback case it existed for either
   signals in `scan-number` or turns out to be a float.
+- Removed `read-string-escape`: an orphaned function with zero call sites,
+  superseded by `parse-escaped-string-rest`'s own inline escape decoding.
+- Closed further coverage gaps found by a follow-up `sb-cover` audit: EOF
+  and invalid-hex-digit handling inside a `\uXXXX` escape, `MAX-STRING-LENGTH`
+  enforcement on a plain run following an earlier escape, every dispatch arm
+  of `write-json-string`'s buffered (unbounded-output) branch, and
+  `read-json`'s truncated-literal/string/container, non-stream-argument, and
+  unrecognised-leading-character paths. `src/` coverage: 92.5% expression
+  (3302/3569), 91.85% branch (575/626).
 - Removed `do-mantissa-digits`: an orphaned macro with zero call sites,
   whose docstring referenced function names that no longer exist in `src/`.
 - Consolidated the NIL/function/fbound-symbol callback-designator coercion

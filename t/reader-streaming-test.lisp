@@ -44,6 +44,22 @@
       (expect (= (json-parse-error-line condition) 2) :to-be-truthy)
       (expect (= (json-parse-error-column condition) 2) :to-be-truthy)))
 
+  (it "reports EOF while framing a truncated literal, string, or container"
+    (dolist (text (list "tru" "\"abc" "[1,2"))
+      (with-input-from-string (stream text)
+        (signals json-parse-error (read-json stream)))))
+
+  (it "frames negative, decimal, and exponent numbers up to the next boundary"
+    (with-input-from-string (stream "-1.5e10 tail")
+      (expect (= (read-json stream) -1.5d10) :to-be-truthy)))
+
+  (it "rejects a non-stream argument"
+    (signals json-parse-error (read-json "not a stream")))
+
+  (it "hands an unrecognised leading character to PARSE for its own diagnostic"
+    (with-input-from-string (stream "x")
+      (signals json-parse-error (read-json stream))))
+
   (it "rejects output-only and non-character streams"
     (signals json-parse-error (read-json (make-string-output-stream)))
     (let ((path (merge-pathnames
