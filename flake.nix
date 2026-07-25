@@ -54,7 +54,7 @@
         rec {
           cl-json-kit = pkgs.sbcl.buildASDFSystem {
             pname = "cl-json-kit";
-            version = "0.2.0";
+            version = "0.3.0";
             src = self;
             systems = [ "cl-json-kit" ];
           };
@@ -66,7 +66,7 @@
           # promotes broken links and unlisted pages to build failures.
           docs = pkgs.stdenvNoCC.mkDerivation {
             pname = "cl-json-kit-docs";
-            version = "0.2.0";
+            version = "0.3.0";
             src = pkgs.lib.fileset.toSource {
               root = ./docs;
               fileset = pkgs.lib.fileset.unions [
