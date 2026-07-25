@@ -85,6 +85,17 @@ symbols listed there are part of the supported API. See the
 - **Portable core, SBCL extras isolated.** The only implementation-specific
   behavior is the `:timeout-seconds` safeguard; everything else is portable
   Common Lisp.
+- **Zero runtime dependencies, by design.** The runtime system depends on
+  nothing outside the Common Lisp standard; only the test system uses
+  `cl-weave`. Before adding a dependency, check that it earns its keep over
+  hand-rolling the few dozen lines it would save — the
+  [nerima-lisp](https://github.com/orgs/nerima-lisp/repositories) org's other
+  packages were surveyed and none fit a pure string/stream JSON codec (e.g.
+  `cl-boundary-kit` abstracts filesystem/network/clock/process boundaries
+  this library never touches; `cl-parser-kit` is a generic parser toolkit
+  that would regress the reader's hand-tuned hot path). Don't wrap a
+  dependency in an adapter layer just to use it "properly" — use it directly
+  or not at all.
 
 ## Building the documentation
 

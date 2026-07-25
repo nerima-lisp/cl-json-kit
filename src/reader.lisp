@@ -29,12 +29,9 @@
 (defun resolve-parser-callback (callback name string position context)
   "Coerce a callback designator (NIL, a function, or an fbound symbol) into a
 function, or report a bad designator as a parse error."
-  (cond
-    ((null callback) nil)
-    ((functionp callback) callback)
-    ((and (symbolp callback) (fboundp callback)) (symbol-function callback))
-    (t (parser-option-error string position context
-                            (format nil "~A function designator" name)))))
+  (resolve-callback-designator callback
+    (parser-option-error string position context
+                         (format nil "~A function designator" name))))
 
 (defun %parse-prefix (string index
                       &key

@@ -102,21 +102,28 @@ multi-character \\uXXXX sequence the caller must handle separately."
              collect `(,letter-char ,character))
      (t nil)))
 
-(defmacro do-mantissa-digits ((digit-value token start end) &body body)
-  "Walk TOKEN's characters from START below END (a scanned number's mantissa
-span), skipping the single decimal point if present, binding DIGIT-VALUE to
-each digit's numeric value and running BODY.  Shared by
-NUMBER-TOKEN-PROPERTIES (checking for an all-zero coefficient) and
-EXACT-NUMBER-VALUE (accumulating the coefficient's exact integer value)."
-  (let ((token-var (gensym "TOKEN"))
-        (index (gensym "INDEX"))
-        (character (gensym "CHARACTER")))
-    `(let ((,token-var ,token))
-       (loop for ,index from ,start below ,end
-             for ,character = (char ,token-var ,index)
-             unless (char= ,character #\.)
-               do (let ((,digit-value (ascii-json-digit-value ,character)))
-                    ,@body)))))
+;;; ---------------------------------------------------------------------
+;;; Callback-designator coercion
+;;; ---------------------------------------------------------------------
+;;; Lives here (rather than in WRITER-MACROS.LISP) only because this file
+;;; loads first; the pattern itself is not reader-specific -- RESOLVE-PARSER-
+;;; CALLBACK (reader.lisp, one call per KEY-DECODER/NUMBER-DECODER/OBJECT-HOOK/
+;;; ARRAY-HOOK) and RESOLVE-NUMBER-ENCODER (writer-state.lisp) both coerce a
+;;; NIL/function/fbound-symbol designator the same way and previously
+;;; re-wrote this three-branch COND by hand in each place.
+(defmacro resolve-callback-designator (designator on-invalid)
+  "DESIGNATOR coerced to a function: NIL passes through as NIL, a function
+passes through unchanged, and an fbound symbol becomes its SYMBOL-FUNCTION.
+Anything else evaluates ON-INVALID instead -- typically the caller's own
+located error form -- rather than returning a value."
+  (let ((designator-var (gensym "DESIGNATOR")))
+    `(let ((,designator-var ,designator))
+       (cond
+         ((null ,designator-var) nil)
+         ((functionp ,designator-var) ,designator-var)
+         ((and (symbolp ,designator-var) (fboundp ,designator-var))
+          (symbol-function ,designator-var))
+         (t ,on-invalid)))))
 
 (defmacro call-with-forwarded-parse-keywords (function &rest leading-arguments)
   "Call FUNCTION with LEADING-ARGUMENTS followed by every keyword in

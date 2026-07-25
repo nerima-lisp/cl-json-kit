@@ -64,6 +64,16 @@ circular list and enforcing MAX-ELEMENTS as it counts."
   (validate-object-keys table)
   (sort (hash-table-pairs table) #'string< :key #'car))
 
+(defun emit-object-member (key value index level)
+  "Emit one \"KEY\":VALUE object member at INDEX within an open WITH-JSON-BRACKETS
+body nested at LEVEL.  Shared by WRITE-JSON-OBJECT and WRITE-JSON-ORDERED-OBJECT
+so hash-table and ordered-object serialization agree on one member shape."
+  (emit-json-member (index level)
+    (write-json-string key)
+    (emit-string (if *json-pretty* ": " ":"))
+    (with-json-path (key)
+      (write-json-value value (1+ level)))))
+
 (defun write-json-object (table level)
   "Serialize a HASH-TABLE as a JSON object, sorted when *JSON-SORT-KEYS*."
   (ensure-depth level)
@@ -72,22 +82,16 @@ circular list and enforcing MAX-ELEMENTS as it counts."
     (unless *json-sort-keys* (validate-object-keys table))
     (with-active-aggregate (table)
       (with-json-brackets (#\{ #\} level count)
-        (labels ((write-member (key value index)
-                   (emit-json-member (index level)
-                     (write-json-string key)
-                     (emit-string (if *json-pretty* ": " ":"))
-                     (with-json-path (key)
-                       (write-json-value value (1+ level))))))
-          (if *json-sort-keys*
-              (loop for (key . value) in pairs
-                    for index from 0
-                    do (write-member key value index))
-              (let ((index 0))
-                (maphash
-                 (lambda (key value)
-                   (write-member key value index)
-                   (incf index))
-                 table))))))))
+        (if *json-sort-keys*
+            (loop for (key . value) in pairs
+                  for index from 0
+                  do (emit-object-member key value index level))
+            (let ((index 0))
+              (maphash
+               (lambda (key value)
+                 (emit-object-member key value index level)
+                 (incf index))
+               table)))))))
 
 ;;; ---------------------------------------------------------------------
 ;;; Objects from ordered JSON-OBJECTs
@@ -106,11 +110,7 @@ circular list and enforcing MAX-ELEMENTS as it counts."
       (with-json-brackets (#\{ #\} level count)
         (loop for (key . value) in members
               for index from 0
-              do (emit-json-member (index level)
-                   (write-json-string key)
-                   (emit-string (if *json-pretty* ": " ":"))
-                   (with-json-path (key)
-                     (write-json-value value (1+ level)))))))))
+              do (emit-object-member key value index level))))))
 
 ;;; ---------------------------------------------------------------------
 ;;; Type dispatch

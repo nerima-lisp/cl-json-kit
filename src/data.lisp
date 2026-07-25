@@ -80,3 +80,12 @@
 
 (defparameter +json-exponent-markers+ '(#\e #\E)
   "The two characters that introduce a JSON number's exponent.")
+
+;;; ---------------------------------------------------------------------
+;;; Hexadecimal digit alphabet
+;;; ---------------------------------------------------------------------
+;;; The writer's only use of hex digits is rendering a \\uXXXX escape's four
+;;; nibbles; naming the alphabet here keeps both call sites indexing the same
+;;; sixteen characters instead of repeating the string literal.
+(defparameter +hex-digits+ "0123456789ABCDEF"
+  "The sixteen uppercase hexadecimal digit characters, indexed by nibble value.")
