@@ -5,6 +5,34 @@ All notable changes to this project are documented here. This page mirrors
 at the repository root, which remains the source of truth. Releases are also
 listed on the [GitHub releases page](https://github.com/nerima-lisp/cl-json-kit/releases).
 
+## [0.3.0] - 2026-07-25
+
+No public API or observable behavior changed in this release; it adds
+documentation and CI/release infrastructure and continues the hot-path
+performance work.
+
+### Added
+
+- Full MkDocs (Material) documentation site under `docs/` (this site),
+  built offline via a new `docs` flake package and published to GitHub
+  Pages on push to `main`.
+- treefmt (nixfmt) formatting gate wired into `nix flake check`, a shared
+  `nix-setup` composite GitHub Action, Dependabot coverage for GitHub
+  Actions (including the nested composite action), and a scheduled
+  `flake.lock` update workflow.
+
+### Changed
+
+- Further hot-path rework: number parsing derives sign/zero/scale directly
+  from the source text range instead of allocating a token substring first;
+  `\uXXXX` escape output writes hex nibbles directly instead of going
+  through `format`; the writer's circular-reference guard hash table is now
+  allocated lazily on first use instead of on every top-level write call;
+  and whitespace classification uses a `case` over char-code.
+- CI: concurrency guard to supersede in-flight runs, pinned `actions/checkout`
+  with `persist-credentials: false`, and the flake now declares only
+  `x86_64-linux` (the platform CI actually builds and tests).
+
 ## [0.2.0] - 2026-07-24
 
 No public API or observable behavior changed in this release; it is an

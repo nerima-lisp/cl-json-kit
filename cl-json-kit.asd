@@ -5,7 +5,7 @@
 and Python's json module.  Object/array shape is decided explicitly at parse time (never guessed
 from the shape of a cons list afterwards), UTF-16 surrogate pairs in \\uXXXX escapes are decoded
 correctly, and parsing can be bounded with a timeout."
-  :version "0.2.0"
+  :version "0.3.0"
   :author "takeokunn <bararararatty@gmail.com>"
   :maintainer "takeokunn <bararararatty@gmail.com>"
   :license "MIT"
@@ -35,7 +35,7 @@ correctly, and parsing can be bounded with a timeout."
 
 (asdf:defsystem "cl-json-kit/test"
   :description "Test system for cl-json-kit"
-  :version "0.2.0"
+  :version "0.3.0"
   :author "takeokunn <bararararatty@gmail.com>"
   :maintainer "takeokunn <bararararatty@gmail.com>"
   :license "MIT"
