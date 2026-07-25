@@ -28,6 +28,22 @@
                             'string)))
       (expect decoded :to-equal expected)))
 
+  (it-each (("\"\\u12") ("\"\\u00zz\""))
+      "rejects the malformed \\u escape ~S"
+      (text)
+    (signals json-parse-error (parse text)))
+
+  (it "enforces MAX-STRING-LENGTH on a plain run following an earlier escape"
+    ;; Entering the slow path via one escape, then scanning a long unescaped
+    ;; run that alone pushes the decoded length over budget, is a distinct
+    ;; code path from an escape-dense string or an all-plain fast-path string.
+    (let ((text (format nil "\"\\n~A\"" (make-string 200 :initial-element #\a))))
+      (signals json-parse-error (parse text :max-string-length 50))
+      (expect (= (length (parse text)) 201) :to-be-truthy)))
+
+  (it "reports EOF when the slow path never finds a closing quote"
+    (signals json-parse-error (parse "\"\\na")))
+
   (it "bounds decoded escaped-string length exactly and combines escapes beyond the BMP"
     ;; The JSON unit a\"b\\cA decodes to the six characters a"b\cA; repeating
     ;; it drives the escaped slow path over a long, mixed-escape string.

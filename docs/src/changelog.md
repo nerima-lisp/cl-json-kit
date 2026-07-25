@@ -48,6 +48,15 @@ listed on the [GitHub releases page](https://github.com/nerima-lisp/cl-json-kit/
   signals in `scan-number` or turns out to be a float.
 - Removed `do-mantissa-digits`: an orphaned macro with zero call sites,
   whose docstring referenced function names that no longer exist in `src/`.
+- Removed `read-string-escape`: an orphaned function with zero call sites,
+  superseded by `parse-escaped-string-rest`'s own inline escape decoding.
+- Closed further coverage gaps found by a follow-up `sb-cover` audit: EOF
+  and invalid-hex-digit handling inside a `\uXXXX` escape, `MAX-STRING-LENGTH`
+  enforcement on a plain run following an earlier escape, every dispatch arm
+  of `write-json-string`'s buffered (unbounded-output) branch, and
+  `read-json`'s truncated-literal/string/container, non-stream-argument, and
+  unrecognised-leading-character paths. `src/` coverage: 92.5% expression
+  (3302/3569), 91.85% branch (575/626).
 - Consolidated the NIL/function/fbound-symbol callback-designator coercion
   that `resolve-parser-callback` (reader) and `resolve-number-encoder`
   (writer) each hand-wrote independently into one shared

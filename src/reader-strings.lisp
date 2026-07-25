@@ -76,21 +76,6 @@ a high/low surrogate pair into one character and rejecting unpaired surrogates."
 ;;; ---------------------------------------------------------------------
 ;;; String bodies
 ;;; ---------------------------------------------------------------------
-(defun read-string-escape (state emit)
-  "At a backslash, consume the escape sequence and call EMIT with its decoded
-character."
-  (ps-advance state)                    ; consume the backslash
-  (when (ps-eof-p state) (parse-error-here state))
-  (let ((letter (ps-peek state)))
-    (if (char= letter #\u)
-        (progn
-          (ps-advance state)
-          (funcall emit (parse-unicode-escape state)))
-        (let ((character (json-unescape-char letter)))
-          (unless character (parse-error-here state))
-          (ps-advance state)
-          (funcall emit character)))))
-
 (defun parse-escaped-string-rest (state start)
   "Validate and size an escaped string, then decode it into one exact buffer."
   (let* ((text (ps-text state))
