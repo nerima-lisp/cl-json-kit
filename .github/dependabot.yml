@@ -1,0 +1,32 @@
+version: 2
+updates:
+  # Keep the GitHub Actions SHA pins in the workflow files up to date.
+  # Dependabot updates both the pinned SHA and its trailing `# vN` comment.
+  # NOTE: `directory: "/"` only covers .github/workflows/* and a repo-root
+  # action.yml -- it does NOT recurse into nested composite actions, so the
+  # nix-setup composite action needs the separate entry below.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: ci
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # The nix-setup composite action pins nix-installer-action and cachix-action;
+  # Dependabot only finds them when pointed at the action's own directory.
+  - package-ecosystem: github-actions
+    directory: "/.github/actions/nix-setup"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: ci
+    groups:
+      github-actions:
+        patterns:
+          - "*"
