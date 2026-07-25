@@ -72,7 +72,77 @@
       (expect (zerop positive) :to-be-truthy)
       (expect negative :to-be-type-of 'double-float)
       (expect (zerop negative) :to-be-truthy)
-      (expect (= (float-sign negative) -1.0d0) :to-be-truthy))))
+      (expect (= (float-sign negative) -1.0d0) :to-be-truthy)))
+  (it "rounds decimal boundaries to the nearest double with ties to even"
+    (expect (= (parse "1.00000000000000011102230246251565404236316680908203125")
+               1.0d0)
+            :to-be-truthy)
+    (expect (= (parse "1.00000000000000011102230246251565404236316680908203126")
+               1.0000000000000002d0)
+            :to-be-truthy)
+    (expect (= (parse "4.9406564584124654e-324") least-positive-double-float)
+            :to-be-truthy)
+    (expect (= (parse "2.2250738585072014e-308") least-positive-normalized-double-float)
+            :to-be-truthy)
+    (expect (= (parse "1.7976931348623157e308") most-positive-double-float)
+            :to-be-truthy)
+    (expect (= (parse "9007199254740993.0") 9007199254740992.0d0)
+            :to-be-truthy)
+    (expect (= (parse "9007199254740995.0") 9007199254740996.0d0)
+            :to-be-truthy))
+  (it "rounds ties on both sides of a binade boundary to even for both signs"
+    (dolist (text (list "1.99999999999999988897769753748434595763683319091796875"
+                        "2.0000000000000002220446049250313080847263336181640625"))
+      (let ((positive (parse text))
+            (negative (parse (concatenate (quote string) "-" text))))
+        (expect positive :to-be-type-of (quote double-float))
+        (expect negative :to-be-type-of (quote double-float))
+        (expect (= (rational positive) 2) :to-be-truthy)
+        (expect (= (rational negative) -2) :to-be-truthy))))
+  (it "rounds the normal and subnormal boundary exactly for both signs"
+    (labels ((dyadic-decimal (numerator denominator-exponent)
+               (let* ((digits (write-to-string
+                               (* numerator (expt 5 denominator-exponent))))
+                      (padding (- denominator-exponent (length digits))))
+                 (concatenate (quote string)
+                              "0."
+                              (make-string padding :initial-element #\0)
+                              digits)))
+             (expect-rational (text expected)
+               (let ((actual (parse text :max-number-length 1200)))
+                 (expect actual :to-be-type-of (quote double-float))
+                 (expect (= (rational actual) expected) :to-be-truthy))))
+      (let* ((max-subnormal-significand (1- (ash 1 52)))
+             (min-normal-significand (ash 1 52))
+             (boundary-midpoint-significand (1- (ash 1 53)))
+             (max-subnormal (/ max-subnormal-significand (ash 1 1074)))
+             (min-normal (/ min-normal-significand (ash 1 1074)))
+             (boundary-midpoint (/ boundary-midpoint-significand (ash 1 1075)))
+             (max-subnormal-text (dyadic-decimal max-subnormal-significand 1074))
+             (min-normal-text (dyadic-decimal min-normal-significand 1074))
+             (boundary-midpoint-text (dyadic-decimal boundary-midpoint-significand 1075)))
+        (expect (= boundary-midpoint (/ (+ max-subnormal min-normal) 2)) :to-be-truthy)
+        (expect-rational max-subnormal-text max-subnormal)
+        (expect-rational min-normal-text min-normal)
+        (expect-rational boundary-midpoint-text min-normal)
+        (expect-rational
+          (concatenate (quote string) "-" max-subnormal-text)
+          (- max-subnormal))
+        (expect-rational
+          (concatenate (quote string) "-" min-normal-text)
+          (- min-normal))
+        (expect-rational
+          (concatenate (quote string) "-" boundary-midpoint-text)
+          (- min-normal)))))
+  (it "falls back to exact rationals instead of infinity or a lost nonzero"
+    (let ((overflow (parse "1.7976931348623159e308"))
+          (underflow (parse "2.4703282292062327e-324")))
+      (expect (rationalp overflow) :to-be-truthy)
+      (expect (plusp overflow) :to-be-truthy)
+      (expect (rationalp underflow) :to-be-truthy)
+      (expect (plusp underflow) :to-be-truthy))
+    (signals json-parse-error (parse "1e10001"))
+    (signals json-parse-error (parse "1e-10001"))))
 
 (describe "strings and unicode"
   (it "decodes escapes, including surrogate pairs beyond the BMP"
@@ -122,7 +192,22 @@
   (it "selects representation from :OBJECT-TYPE and :ARRAY-TYPE"
     (expect "[1,[2]]" :to-parse-as #(1 #(2)))
     (expect (parse "[1,[2]]" :array-type :list) :to-equal (list 1 (list 2)))
-    (expect (parse "{\"x\":1}" :object-type :alist) :to-equal (list (cons "x" 1))))
+    (expect (parse "{\"x\":1}" :object-type :alist) :to-equal (list (cons "x" 1)))
+    (dolist (count (list 0 1 8 255 256 257 512 513 1024 100000))
+      (let* ((expected (loop for index below count collect index))
+             (input (with-output-to-string (stream)
+                      (write-char #\[ stream)
+                      (loop for index below count
+                            do (when (plusp index)
+                                 (write-char #\, stream))
+                               (princ index stream))
+                      (write-char #\] stream)))
+             (vector (parse input :array-type :vector))
+             (list-value (parse input :array-type :list)))
+        (expect (typep vector (quote simple-vector)) :to-be-truthy)
+        (expect (length vector) :to-equal count)
+        (expect (coerce vector (quote list)) :to-equal expected)
+        (expect list-value :to-equal expected))))
 
   (it-each ((:first 1) (:last 2))
       "resolves duplicate keys under policy ~S"
@@ -131,9 +216,20 @@
                expected)
             :to-be-truthy))
 
-  (it "preserves ordered duplicates only under :PRESERVE with an alist"
-    (expect (parse "{\"a\":1,\"a\":2}" :object-type :alist :duplicate-key-policy :preserve)
-            :to-equal (list (cons "a" 1) (cons "a" 2))))
+  (it "preserves ordered duplicates and decoded-key collisions under :PRESERVE with an alist"
+    (expect (parse "{\"a\":1,\"a\":2}"
+                   :object-type :alist
+                   :duplicate-key-policy :preserve)
+            :to-equal (list (cons "a" 1) (cons "a" 2)))
+    (let ((calls 0))
+      (expect (parse "{\"A\":1,\"a\":2}"
+                     :object-type :alist
+                     :duplicate-key-policy :preserve
+                     :key-decoder (lambda (key)
+                                    (incf calls)
+                                    (string-downcase key)))
+              :to-equal (list (cons "a" 1) (cons "a" 2)))
+      (expect (= calls 2) :to-be-truthy)))
 
   (it "reports the offending key when :ERROR meets a duplicate"
     (let ((condition
@@ -217,6 +313,33 @@
                                              (parse-integer token)))))
         (expect (= calls 2) :to-be-truthy)
         (expect (= (gethash "a" object) 1) :to-be-truthy))))
+
+  (it "parses mixed RFC whitespace in vector and list arrays"
+    (let ((text (format nil "[~C1~C,~C2~C]"
+                        (code-char #x09)
+                        (code-char #x0D)
+                        (code-char #x0A)
+                        (code-char #x20))))
+      (let ((vector (parse text :array-type :vector))
+            (list-value (parse text :array-type :list)))
+        (expect (typep vector (quote simple-vector)) :to-be-truthy)
+        (expect (coerce vector (quote list)) :to-equal (list 1 2))
+        (expect list-value :to-equal (list 1 2)))))
+
+  (it "parses mixed RFC whitespace through every generic alist policy"
+    (let ((text (format nil "{~C\"a\"~C:~C1~C,~C\"b\"~C:~C2~C}"
+                        (code-char #x09)
+                        (code-char #x20)
+                        (code-char #x0D)
+                        (code-char #x0A)
+                        (code-char #x09)
+                        (code-char #x0D)
+                        (code-char #x20)
+                        (code-char #x0A)))
+          (expected (list (cons "a" 1) (cons "b" 2))))
+      (dolist (policy (list :first :last :preserve :error))
+        (expect (parse text :object-type :alist :duplicate-key-policy policy)
+                :to-equal expected))))
 
   (it-each (("{\"a\":1,}") ("{\"a\":1 2}") ("[1,]") ("[1 2]") ("{\"a\":{}}"))
       "rejects the malformed structure ~S"
@@ -319,10 +442,14 @@
       (option value)
     (signals json-parse-error (parse "null" option value)))
 
-  (it "rejects trailing input and non-RFC whitespace"
-    (expect (= (parse (format nil "~C~C~C~C1" #\Space #\Tab #\Return #\Newline)) 1)
-            :to-be-truthy)
-    (signals json-parse-error (parse (format nil "~C1" #\Page)))
+  (it "accepts only RFC whitespace and rejects trailing input"
+    (dolist (code (list #x20 #x09 #x0A #x0D))
+      (expect (= (parse (format nil "~C1~C"
+                                (code-char code)
+                                (code-char code)))
+                 1)
+              :to-be-truthy))
+    (signals json-parse-error (parse (format nil "~C1" (code-char #x0C))))
     (signals json-parse-error (parse "true false"))
     (signals json-parse-error (parse "[]x"))))
 
@@ -361,6 +488,30 @@
       (expect (= (json-parse-error-line condition) 1) :to-be-truthy)
       (expect (= (json-parse-error-column condition) 8) :to-be-truthy)))
 
+  (it "reports exact EOF diagnostics at array and generic object values"
+    (dolist (case (list (list "[1,   " (list :array-type :vector) 6 (list 1))
+                        (list "[1,   " (list :array-type :list) 6 (list 1))
+                        (list "{\"a\":   "
+                              (list :object-type :alist :duplicate-key-policy :last)
+                              8
+                              (list "a"))))
+      (destructuring-bind (text options position path) case
+        (let ((condition (capture-json-parse-error
+                          (apply (function parse) text options))))
+          (expect (= (json-parse-error-position condition) position) :to-be-truthy)
+          (expect (json-parse-error-path condition) :to-equal path)
+          (expect (string= (json-parse-error-expected condition) "JSON value")
+                  :to-be-truthy)))))
+
+  (it "preserves the trailing-comma diagnostic after RFC whitespace"
+    (dolist (array-type (list :vector :list))
+      (let ((condition
+              (capture-json-parse-error (parse "[1, ]" :array-type array-type))))
+        (expect (= (json-parse-error-position condition) 4) :to-be-truthy)
+        (expect (json-parse-error-path condition) :to-equal nil)
+        (expect (string= (json-parse-error-expected condition) "array value")
+                :to-be-truthy))))
+
   (it "tracks the structured path only while parsing the offending member value"
     (dolist (case (list (list "{\"a\":[{\"b\":[0,?]}]}" (list "a" 0 "b" 1))
                         (list "[[0],[1,?]]" (list 1 1))
@@ -394,12 +545,38 @@
                         :key-decoder (lambda (key) (string-downcase key))
                         :number-decoder (lambda (token integer-p) (list token integer-p)))))
       (expect (gethash "foo" value) :to-equal (list "12" t))
-      (expect (gethash "n" value) :to-equal (list "1.5" nil))))
+      (expect (gethash "n" value) :to-equal (list "1.5" nil)))
+    (expect (parse "1e10001"
+                   :max-exact-exponent 1
+                   :number-decoder (lambda (token integer-p)
+                                     (list token integer-p)))
+            :to-equal
+            (list "1e10001" nil)))
 
   (it "applies object and array hooks"
     (expect (parse "[1,2]" :array-type :list :array-hook #'reverse) :to-equal (list 2 1))
     (expect (= (parse "{\"a\":1}" :object-hook (lambda (object) (gethash "a" object))) 1)
             :to-be-truthy))
+
+  (it "passes exact hybrid-boundary vectors once through ARRAY-HOOK"
+    (dolist (count (list 256 257 512 513))
+      (let* ((expected (coerce (loop for index below count collect index)
+                               (quote simple-vector)))
+             (input (format nil "[~{~D~^,~}]"
+                            (coerce expected (quote list))))
+             (calls 0)
+             (received nil)
+             (hook-result (list :hook-result count))
+             (result (parse input
+                            :array-hook
+                            (lambda (array)
+                              (incf calls)
+                              (setf received array)
+                              hook-result))))
+        (expect (= calls 1) :to-be-truthy)
+        (expect (typep received (quote simple-vector)) :to-be-truthy)
+        (expect received :to-equalp expected)
+        (expect (eq result hook-result) :to-be-truthy))))
 
   (it "requires KEY-DECODER to return a string, blaming the key path"
     (let ((condition

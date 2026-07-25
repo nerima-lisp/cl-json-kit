@@ -26,13 +26,18 @@ JSON-SERIALIZATION-ERROR can report where in the value it occurred."
 serialization error if VALUE is already being written (a reference cycle).
 The mark is always cleared on the way out so shared -- but acyclic -- subtrees
 remain writable."
-  (let ((value-var (gensym "VALUE")))
-    `(let ((,value-var ,value))
-       (when (gethash ,value-var *json-active-aggregates*)
+  (let ((value-var (gensym "VALUE"))
+        (active-var (gensym "ACTIVE")))
+    `(let* ((,value-var ,value)
+            (,active-var
+              (or *json-active-aggregates*
+                  (setf *json-active-aggregates*
+                        (make-hash-table :test #'eq)))))
+       (when (gethash ,value-var ,active-var)
          (serialization-error "circular aggregate value"))
-       (setf (gethash ,value-var *json-active-aggregates*) t)
+       (setf (gethash ,value-var ,active-var) t)
        (unwind-protect (progn ,@body)
-         (remhash ,value-var *json-active-aggregates*)))))
+         (remhash ,value-var ,active-var)))))
 
 ;;; ---------------------------------------------------------------------
 ;;; Data-driven string escapes (encode direction)

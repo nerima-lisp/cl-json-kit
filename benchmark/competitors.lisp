@@ -462,13 +462,15 @@
       (funcall thunk)
       (let* ((end-time (get-internal-real-time))
              #+sbcl (end-bytes (sb-ext:get-bytes-consed))
-             (seconds (/ (- end-time start-time)
+             (elapsed-ticks (- end-time start-time))
+             (seconds (/ elapsed-ticks
                          (float internal-time-units-per-second 1d0)))
              (throughput (if (plusp seconds)
                              (/ input-bytes seconds 1024d0 1024d0)
                              0d0))
              #+sbcl (consed (- end-bytes start-bytes)))
-        (list :wall-seconds seconds
+        (list :elapsed-ticks elapsed-ticks
+              :wall-seconds seconds
               :throughput throughput
               :consed-bytes #+sbcl consed #-sbcl 0))))
   (defun summarize-samples (samples)
@@ -543,16 +545,24 @@
             (funcall (benchmark-case-thunk case)))))))
   (defun collect-samples (cases rng)
     (let ((samples (make-hash-table :test (function eq)))
-          (orders nil))
+          (orders nil)
+          (raw-samples nil))
       (dotimes (round *iteration-count*)
         (let* ((round-seed (benchmark-rng-state rng))
                (ordered-cases (shuffled-cases cases rng)))
           (push (order-record "sample" round round-seed ordered-cases) orders)
-          (dolist (case ordered-cases)
-            (push (measure-sample (benchmark-case-thunk case)
-                                  (benchmark-case-input-bytes case))
-                  (gethash case samples)))))
-      (values samples (nreverse orders)))))
+          (loop for case in ordered-cases
+                for order-index from 0
+                for sample = (measure-sample (benchmark-case-thunk case)
+                                             (benchmark-case-input-bytes case))
+                do (push sample (gethash case samples))
+                   (push (list :round round
+                               :round-seed round-seed
+                               :order-index order-index
+                               :case case
+                               :sample sample)
+                         raw-samples))))
+      (values samples (nreverse orders) (nreverse raw-samples)))))
 
 
 (progn
@@ -578,8 +588,7 @@
          (list #\Space #\Tab #\Newline #\Return)
          (uiop:run-program (cons program arguments)
                            :output :string
-                           :error-output nil
-                           :ignore-error-status t))
+                           :error-output nil))
       (error () "unknown")))
   (defun nonempty-or-unknown (value)
     (if (and (stringp value) (plusp (length value)))
@@ -634,7 +643,7 @@
     (append
      (list
       (list "schema" "cl-json-kit-competitor-benchmark")
-      (list "schema_version" "2")
+      (list "schema_version" "3")
       (list "run_utc" (utc-run-time))
       (list "source_root"
             (handler-case (namestring (truename "."))
@@ -666,7 +675,24 @@
       (lambda (path)
         (list (format nil "sha256:~A" path)
               (source-sha256 path)))
-      (list "benchmark/competitors.lisp"
+      (list "cl-json-kit.asd"
+            "src/package.lisp"
+            "src/data.lisp"
+            "src/reader-macros.lisp"
+            "src/writer-macros.lisp"
+            "src/conditions.lisp"
+            "src/parser-state.lisp"
+            "src/reader-strings.lisp"
+            "src/reader-numbers.lisp"
+            "src/reader-collections.lisp"
+            "src/reader.lisp"
+            "src/reader-stream.lisp"
+            "src/writer-state.lisp"
+            "src/writer-scalars.lisp"
+            "src/writer-collections.lisp"
+            "src/writer.lisp"
+            "src/conversion.lisp"
+            "benchmark/competitors.lisp"
             "benchmark/run.lisp"
             "benchmark/README.md"
             "flake.nix"
@@ -709,7 +735,7 @@
         (second consed)
         (third consed)
         (fourth consed)))))
-  (defun emit-report (cases samples orders)
+  (defun emit-report (cases samples orders raw-samples)
     (emit-fields (list "record" "key" "value"))
     (dolist (metadata (benchmark-metadata))
       (emit-fields (list "meta" (first metadata) (second metadata))))
@@ -717,6 +743,48 @@
      (list "record" "phase" "round" "round_seed" "case_count" "case_ids"))
     (dolist (order orders)
       (emit-order-row order))
+    (emit-fields
+     (list "record"
+           "phase"
+           "round"
+           "round_seed"
+           "order_index"
+           "case_id"
+           "library"
+           "version"
+           "dom"
+           "api"
+           "mode"
+           "operation"
+           "workload"
+           "input_bytes"
+           "elapsed_ticks"
+           "wall_seconds"
+           "throughput_mib_s"
+           "consed_bytes"))
+    (dolist (raw-sample raw-samples)
+      (let* ((case (getf raw-sample :case))
+             (sample (getf raw-sample :sample))
+             (adapter (benchmark-case-adapter case)))
+        (emit-fields
+         (list "sample"
+               "sample"
+               (getf raw-sample :round)
+               (getf raw-sample :round-seed)
+               (getf raw-sample :order-index)
+               (benchmark-case-id case)
+               (adapter-name adapter)
+               (adapter-version adapter)
+               (adapter-dom adapter)
+               (adapter-api adapter)
+               (benchmark-case-mode case)
+               (benchmark-case-operation case)
+               (benchmark-case-workload case)
+               (benchmark-case-input-bytes case)
+               (getf sample :elapsed-ticks)
+               (getf sample :wall-seconds)
+               (getf sample :throughput)
+               (getf sample :consed-bytes)))))
     (emit-fields
      (list
       "record"
@@ -806,8 +874,11 @@
        (length cases)
        *iteration-count*
        *warmup-count*)
-      (multiple-value-bind (samples sample-orders)
+      (multiple-value-bind (samples sample-orders raw-samples)
           (collect-samples cases rng)
-        (emit-report cases samples (append warmup-orders sample-orders))))))
+        (emit-report cases
+                     samples
+                     (append warmup-orders sample-orders)
+                     raw-samples)))))
 
 (run)

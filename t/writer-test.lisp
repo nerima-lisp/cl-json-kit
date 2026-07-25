@@ -82,7 +82,90 @@
       (when surrogate
         (signals json-serialization-error (stringify (string surrogate)))
         (signals json-serialization-error
-          (stringify (concatenate 'string "plain" (string surrogate) "tail")))))))
+          (stringify (concatenate 'string "plain" (string surrogate) "tail"))))))
+
+  (it "accounts dense escaped output at exact maximum-length boundaries"
+    (let* ((unit (concatenate 'string "\"" "\\"
+                              (string (code-char #x00))
+                              (string (code-char #x1f))
+                              "ab"))
+           (input (with-output-to-string (stream)
+                    (loop repeat 24
+                          do (write-string unit stream))
+                    (write-string "tail" stream)))
+           (expected (with-output-to-string (stream)
+                       (write-char #\" stream)
+                       (loop repeat 24
+                             do (write-string "\\\"" stream)
+                                (write-string "\\\\" stream)
+                                (write-string "\\u0000" stream)
+                                (write-string "\\u001F" stream)
+                                (write-string "ab" stream))
+                       (write-string "tail\"" stream)))
+           (exact-length (length expected)))
+      (progn
+        (expect (= (length input) 148) :to-be-truthy)
+        (dolist (size (list 4095 4096 8193))
+          (let* ((dense-input (make-string size :initial-element #\"))
+                 (dense-expected
+                   (with-output-to-string (stream)
+                     (write-char #\" stream)
+                     (loop repeat size do (write-string "\\\"" stream))
+                     (write-char #\" stream))))
+            (expect (stringify dense-input) :to-equal dense-expected)))
+        (let* ((late-input
+                 (concatenate (quote string)
+                              (make-string 12 :initial-element #\")
+                              (make-string 8168 :initial-element #\a)
+                              "\"\\"
+                              (string (code-char #x00))))
+               (late-expected
+                 (with-output-to-string (stream)
+                   (write-char #\" stream)
+                   (loop repeat 12 do (write-string "\\\"" stream))
+                   (loop repeat 8168 do (write-char #\a stream))
+                   (write-string "\\\"" stream)
+                   (write-string "\\\\" stream)
+                   (write-string "\\u0000" stream)
+                   (write-char #\" stream))))
+          (expect (stringify late-input) :to-equal late-expected)))
+      (expect (>= (loop for index below 128
+                        for character = (char input index)
+                        count (or (char= character #\")
+                                  (char= character #\\)))
+                  12)
+              :to-be-truthy)
+      (dolist (case (list (cons (1- exact-length) t)
+                          (cons exact-length nil)
+                          (cons (1+ exact-length) nil)))
+        (let ((stream (make-string-output-stream))
+              (signalled nil)
+              (json-kit::*json-output-count* 0)
+              (json-kit::*json-maximum-output-length* (car case)))
+          (let ((json-kit::*json-output-stream* stream))
+            (handler-case (json-kit::write-json-string input)
+              (json-serialization-error ()
+                (setf signalled t))))
+          (let ((output (get-output-stream-string stream)))
+            (expect (eq signalled (cdr case)) :to-be-truthy)
+            (expect (string= output
+                             (if (cdr case)
+                                 (subseq expected 0 (car case))
+                                 expected))
+                    :to-be-truthy)
+            (expect (= json-kit::*json-output-count* (length output))
+                    :to-be-truthy)))))))
+
+(describe "bounded dense string escaping"
+  (it "keeps quote and backslash escapes atomic"
+    (dolist (escape (list #\" #\\))
+      (let ((input (make-string 128 :initial-element #\a))
+            (stream (make-string-output-stream)))
+        (fill input escape :end 12)
+        (signals json-serialization-error
+          (write-json input stream :max-output-length 2))
+        (expect (string= (get-output-stream-string stream) (string #\"))
+                :to-be-truthy)))))
 
 (describe "pretty printing and key ordering"
   (it "indents nested output when :PRETTY"
@@ -197,7 +280,40 @@
       (expect (string= (stringify huge :max-output-length 1 :number-encoder (constantly "0")) "0")
               :to-be-truthy))
     (signals json-serialization-error
-      (stringify (/ (1+ (ash 1 128)) (ash 1 128)) :max-output-length 32))))
+      (stringify (/ (1+ (ash 1 128)) (ash 1 128)) :max-output-length 32)))
+
+  (it "validates options in order without writing output"
+    (dolist (case
+             (list
+              (list (list :indent -1
+                          :max-depth -1
+                          :max-elements -1
+                          :max-output-length -1)
+                    "INDENT must be a non-negative integer, not -1")
+              (list (list :max-depth -1
+                          :max-elements -1
+                          :max-output-length -1)
+                    "MAX-DEPTH must be NIL or a non-negative integer, not -1")
+              (list (list :max-depth nil
+                          :max-elements -1
+                          :max-output-length -1)
+                    "MAX-ELEMENTS must be NIL or a non-negative integer, not -1")
+              (list (list :max-depth nil
+                          :max-elements nil
+                          :max-output-length -1)
+                    "MAX-OUTPUT-LENGTH must be NIL or a non-negative integer, not -1")))
+      (destructuring-bind (options expected-message) case
+        (let ((stream (make-string-output-stream)))
+          (handler-case
+              (progn
+                (apply #'write-json #(1) stream options)
+                (error "Expected option validation to fail"))
+            (json-serialization-error (condition)
+              (expect (string= (json-serialization-error-message condition)
+                               expected-message)
+                      :to-be-truthy)))
+          (expect (string= (get-output-stream-string stream) "")
+                  :to-be-truthy))))))
 
 (describe "cycles and shape validation"
   (it "rejects circular aggregates but permits shared acyclic subtrees"
@@ -234,7 +350,41 @@
     (let ((table (make-hash-table :test #'eq)))
       (setf (gethash (copy-seq "same") table) 1
             (gethash (copy-seq "same") table) 2)
-      (signals json-serialization-error (stringify table)))))
+      (signals json-serialization-error (stringify table))))
+
+  (it "creates cycle tracking lazily and clears marks on exit"
+    (let ((seen :unset))
+      (expect
+        (string=
+          (stringify 1 :number-encoder
+            (lambda (number)
+              (declare (ignore number))
+              (setf seen json-kit::*json-active-aggregates*)
+              "1"))
+          "1")
+        :to-be-truthy)
+      (expect (null seen) :to-be-truthy))
+    (let ((seen nil))
+      (expect
+        (string=
+          (stringify #(1) :number-encoder
+            (lambda (number)
+              (declare (ignore number))
+              (setf seen json-kit::*json-active-aggregates*)
+              "1"))
+          "[1]")
+        :to-be-truthy)
+      (expect (hash-table-p seen) :to-be-truthy)
+      (expect (zerop (hash-table-count seen)) :to-be-truthy))
+    (let ((seen nil))
+      (signals error
+        (stringify #(1) :number-encoder
+          (lambda (number)
+            (declare (ignore number))
+            (setf seen json-kit::*json-active-aggregates*)
+            (error "forced number encoder failure"))))
+      (expect (hash-table-p seen) :to-be-truthy)
+      (expect (zerop (hash-table-count seen)) :to-be-truthy))))
 
 (describe "output stream designators"
   (it "writes to a stream and returns the value"

@@ -54,7 +54,7 @@
   (max-object-members 1000000 :type integer)
   (context "json"))
 
-(declaim (inline ps-eof-p ps-peek ps-advance))
+(declaim (inline ps-eof-p ps-peek ps-advance whitespace-char-p skip-whitespace expect-char))
 
 (defun ps-eof-p (state)
   (>= (ps-pos state) (ps-length state)))
@@ -100,8 +100,9 @@ optionally, what was EXPECTED."
 (defun whitespace-char-p (character)
   "True for the four characters RFC 8259 allows between tokens."
   (and character
-       (member character '(#\Space #\Tab #\Newline #\Return #\Linefeed)
-               :test #'char=)))
+       (case (char-code character)
+         ((#x20 #x09 #x0A #x0D) t)
+         (otherwise nil))))
 
 (defun skip-whitespace (state)
   (loop while (whitespace-char-p (ps-peek state))

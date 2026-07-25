@@ -164,41 +164,111 @@ only an escape or control character interrupts the run, so an ordinary string
 costs one write rather than one per character."
   (declare (type string string))
   (emit-character #\")
-  (let ((size (length string))
-        (run-start 0))
-    (declare (type fixnum size run-start))
-    (labels ((flush-run (end)
-               ;; Emit STRING[run-start, end) verbatim.  When the whole run fits
-               ;; the budget it is one RESERVE-OUTPUT and one WRITE-STRING; when
-               ;; it would overrun, fall back to character-at-a-time so the
-               ;; stream stops at exactly the byte the bounded path would and
-               ;; RESERVE-OUTPUT signals there.
-               (when (< run-start end)
-                 (let ((length (- end run-start)))
-                   (if (or (null *json-maximum-output-length*)
-                           (<= length (- *json-maximum-output-length* *json-output-count*)))
-                       (progn
-                         (reserve-output length)
-                         (write-string string *json-output-stream* :start run-start :end end))
-                       (loop for index from run-start below end
-                             do (emit-character (char string index))))))))
-      (loop for index below size
-            for character = (char string index)
-            for code = (char-code character)
-            do (let ((letter (json-escape-letter character)))
-                 (cond
-                   ((<= #xd800 code #xdfff)
-                    (flush-run index)
-                    (serialization-error "JSON strings cannot contain raw surrogate characters"))
-                   (letter (flush-run index) (emit-character #\\) (emit-character letter)
-                           (setf run-start (1+ index)))
-                   ((char= character #\") (flush-run index) (emit-string "\\\"")
-                    (setf run-start (1+ index)))
-                   ((char= character #\\) (flush-run index) (emit-string "\\\\")
-                    (setf run-start (1+ index)))
-                   ((< code #x20) (flush-run index) (emit-string (format nil "\\u~4,'0X" code))
-                    (setf run-start (1+ index)))
-                   ;; An ordinary character extends the current run.
-                   (t nil))))
-      (flush-run size)))
+  (let ((size (length string)))
+    (declare (type fixnum size))
+    (if (and (null *json-maximum-output-length*)
+             (>= size 128)
+             (loop for index fixnum below 16
+                   for character = (char string index)
+                   thereis (or (char= character #\")
+                               (char= character #\\)))
+             (>= (loop for index fixnum below 128
+                       for character = (char string index)
+                       count (or (char= character #\")
+                                 (char= character #\\)))
+                 12))
+        (let* ((buffer-size (if (< size 4096) (* size 2) 8192))
+               (buffer (make-string buffer-size))
+               (used 0))
+          (declare (type fixnum buffer-size used)
+                   (type simple-string buffer))
+          (labels ((flush-buffer ()
+                     (unless (zerop used)
+                       (if (or (null *json-maximum-output-length*)
+                               (<= used (- *json-maximum-output-length*
+                                           *json-output-count*)))
+                           (progn
+                             (reserve-output used)
+                             (write-string buffer *json-output-stream* :end used))
+                           (loop for index fixnum below used
+                                 do (emit-character (schar buffer index))))
+                       (setf used 0))))
+            (loop for index fixnum below size
+                  for character = (char string index)
+                  for code fixnum = (char-code character)
+                  do (cond
+                       ((< code #x20)
+                        (flush-buffer)
+                        (let ((letter (json-escape-letter character)))
+                          (if letter
+                              (progn (emit-character #\\) (emit-character letter))
+                              (progn
+                                (reserve-output 6)
+                                (write-string "\\u00" *json-output-stream*)
+                                (write-char (schar "0123456789ABCDEF" (ash code -4))
+                                            *json-output-stream*)
+                                (write-char (schar "0123456789ABCDEF" (logand code #x0f))
+                                            *json-output-stream*)))))
+                       ((char= character #\")
+                        (when (> used (- buffer-size 2))
+                          (flush-buffer))
+                        (setf (schar buffer used) #\\
+                              (schar buffer (1+ used)) #\")
+                        (incf used 2))
+                       ((char= character #\\)
+                        (when (> used (- buffer-size 2))
+                          (flush-buffer))
+                        (setf (schar buffer used) #\\
+                              (schar buffer (1+ used)) #\\)
+                        (incf used 2))
+                       ((<= #xd800 code #xdfff)
+                        (flush-buffer)
+                        (serialization-error
+                         "JSON strings cannot contain raw surrogate characters"))
+                       (t
+                        (when (= used buffer-size)
+                          (flush-buffer))
+                        (setf (schar buffer used) character)
+                        (incf used))))
+            (flush-buffer)))
+        (let ((run-start 0))
+          (declare (type fixnum run-start))
+          (labels ((flush-run (end)
+                     (when (< run-start end)
+                       (let ((length (- end run-start)))
+                         (if (or (null *json-maximum-output-length*)
+                                 (<= length (- *json-maximum-output-length*
+                                               *json-output-count*)))
+                             (progn
+                               (reserve-output length)
+                               (write-string string *json-output-stream*
+                                             :start run-start :end end))
+                             (loop for index from run-start below end
+                                   do (emit-character (char string index))))))))
+            (loop for index below size
+                  for character = (char string index)
+                  for code = (char-code character)
+                  do (cond
+                       ((< code #x20)
+                        (flush-run index)
+                        (let ((letter (json-escape-letter character)))
+                          (if letter
+                              (progn (emit-character #\\) (emit-character letter))
+                              (progn
+                                (reserve-output 6)
+                                (write-string "\\u00" *json-output-stream*)
+                                (write-char (schar "0123456789ABCDEF" (ash code -4))
+                                            *json-output-stream*)
+                                (write-char (schar "0123456789ABCDEF" (logand code #x0f))
+                                            *json-output-stream*))))
+                        (setf run-start (1+ index)))
+                       ((char= character #\") (flush-run index) (emit-string "\\\"")
+                        (setf run-start (1+ index)))
+                       ((char= character #\\) (flush-run index) (emit-string "\\\\")
+                        (setf run-start (1+ index)))
+                       ((<= #xd800 code #xdfff)
+                        (flush-run index)
+                        (serialization-error
+                         "JSON strings cannot contain raw surrogate characters"))))
+            (flush-run size)))))
   (emit-character #\"))

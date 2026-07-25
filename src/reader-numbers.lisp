@@ -1,11 +1,10 @@
 ;;;; src/reader-numbers.lisp
 ;;;;
-;;;; JSON numbers.  Reading a number is three separable jobs, one function
-;;;; each: SCAN-NUMBER validates the RFC 8259 grammar and returns the raw
-;;;; token, NUMBER-TOKEN-PROPERTIES derives sign/zero/scale (and enforces the
-;;;; exact-exponent bound), and the DECODE-*-TOKEN pair turns a token into a
-;;;; Lisp integer, ratio, or double-float.  PARSE-NUMBER just wires them
-;;;; together and consults an optional user NUMBER-DECODER first.
+;;;; JSON numbers.  SCAN-NUMBER validates RFC 8259 grammar while collecting
+;;;; sign, zero, and decimal-scale metadata for the range decoders.  The
+;;;; DECODE-*-RANGE pair then produces a Lisp integer, ratio, or double-float.
+;;;; PARSE-NUMBER wires them together and consults an optional user
+;;;; NUMBER-DECODER first.
 (in-package #:json-kit)
 
 (declaim (inline ascii-json-digit-p ascii-json-digit-value))
@@ -19,134 +18,178 @@
 ;;; ---------------------------------------------------------------------
 ;;; Token analysis
 ;;; ---------------------------------------------------------------------
-(defun number-token-properties (state token)
-  "Return (VALUES NEGATIVE-P COEFFICIENT-ZERO-P SCALE) for the scanned numeric
-TOKEN, where SCALE is the power of ten the integer coefficient is multiplied
-by.  Signals when the effective scale would exceed MAX-EXACT-EXPONENT, scanning
-the exponent digit by digit so an enormous exponent literal cannot overflow
-before the bound is checked."
-  (let* ((length (length token))
-         (negative-p (char= (char token 0) #\-))
-         (mantissa-start (if negative-p 1 0))
-         (exponent-position (or (position #\e token :test #'char-equal) length))
-         (point-position (position #\. token :end exponent-position))
-         (fractional-digits
-           (if point-position (- exponent-position point-position 1) 0))
-         (coefficient-zero-p t)
-         (exponent 0)
-         (exponent-negative-p nil)
-         (exponent-limit (+ (ps-max-exact-exponent state) fractional-digits)))
-    (do-mantissa-digits (digit-value token mantissa-start exponent-position)
-      (unless (zerop digit-value) (setf coefficient-zero-p nil)))
-    (when (< exponent-position length)
-      (let ((index (1+ exponent-position)))
-        (when (member (char token index) +json-sign-characters+)
-          (setf exponent-negative-p (char= (char token index) #\-))
-          (incf index))
-        (loop while (< index length)
-              for digit = (ascii-json-digit-value (char token index))
-              do (unless coefficient-zero-p
-                   (when (or (> exponent (floor exponent-limit 10))
-                             (and (= exponent (floor exponent-limit 10))
-                                  (> digit (mod exponent-limit 10))))
-                     (parse-error-here state "number scale within MAX-EXACT-EXPONENT"))
-                   (setf exponent (+ (* exponent 10) digit)))
-                 (incf index))))
-    (when exponent-negative-p
-      (setf exponent (- exponent)))
-    (let ((scale (- exponent fractional-digits)))
-      (unless coefficient-zero-p
-        (when (> (abs scale) (ps-max-exact-exponent state))
-          (parse-error-here state "number scale within MAX-EXACT-EXPONENT")))
-      (values negative-p coefficient-zero-p scale))))
-
-(defun exact-number-value (state token)
-  "The exact rational value of TOKEN, used when a platform float read would
-lose precision (very large or very small magnitudes)."
-  (multiple-value-bind (negative-p coefficient-zero-p scale)
-      (number-token-properties state token)
-    (let ((coefficient 0)
-          (mantissa-start (if negative-p 1 0))
-          (exponent-position
-            (or (position #\e token :test #'char-equal) (length token))))
-      (unless coefficient-zero-p
-        (do-mantissa-digits (digit-value token mantissa-start exponent-position)
-          (setf coefficient (+ (* coefficient 10) digit-value))))
-      (let ((magnitude
-              (cond
-                (coefficient-zero-p 0)
-                ((minusp scale) (/ coefficient (expt 10 (- scale))))
-                (t (* coefficient (expt 10 scale))))))
-        (if negative-p (- magnitude) magnitude)))))
+(defun exact-number-range-value
+    (text start end negative-p coefficient-zero-p scale)
+  "Return the exact rational value represented by TEXT[start,end)."
+  (let ((coefficient 0)
+        (index (if negative-p (1+ start) start)))
+    (unless coefficient-zero-p
+      (loop while (< index end)
+            for character = (char text index)
+            until (member character +json-exponent-markers+)
+            do (unless (char= character #\.)
+                 (setf coefficient (+ (* coefficient 10)
+                                      (ascii-json-digit-value character))))
+               (incf index)))
+    (let ((magnitude
+            (cond
+              (coefficient-zero-p 0)
+              ((minusp scale) (/ coefficient (expt 10 (- scale))))
+              (t (* coefficient (expt 10 scale))))))
+      (if negative-p (- magnitude) magnitude))))
 
 ;;; ---------------------------------------------------------------------
 ;;; Scanning and decoding
 ;;; ---------------------------------------------------------------------
 (defun scan-number (state)
-  "Validate a JSON number at the cursor and return (VALUES TOKEN FLOATING-P),
-advancing past it.  Enforces MAX-NUMBER-LENGTH as each character is consumed."
+  "Validate a JSON number and return its range plus metadata needed for decoding."
   (let ((start (ps-pos state))
-        (floating-point-p nil))
+        (floating-point-p nil)
+        (negative-p nil)
+        (coefficient-zero-p t)
+        (fractional-digits 0)
+        (exponent 0)
+        (exponent-negative-p nil)
+        (exponent-overflow-p nil))
     (labels ((advance ()
                (when (>= (- (ps-pos state) start) (ps-max-number-length state))
                  (parse-error-here state "shorter number"))
                (ps-advance state))
-             (digits ()
+             (coefficient-digits (fractional-p)
                (loop with count = 0
-                     while (and (ps-peek state) (ascii-json-digit-p (ps-peek state)))
-                     do (advance) (incf count)
+                     while (and (ps-peek state)
+                                (ascii-json-digit-p (ps-peek state)))
+                     for digit = (ascii-json-digit-value (ps-peek state))
+                     do (unless (zerop digit)
+                          (setf coefficient-zero-p nil))
+                        (when fractional-p (incf fractional-digits))
+                        (advance)
+                        (incf count)
                      finally (return count)))
-             (require-digits ()
-               (when (zerop (digits))
-                 (parse-error-here state "decimal digit"))))
-      (when (eql (ps-peek state) #\-) (advance))
+             (require-coefficient-digits (fractional-p)
+               (when (zerop (coefficient-digits fractional-p))
+                 (parse-error-here state "decimal digit")))
+             (exponent-digits ()
+               (let* ((limit (+ (ps-max-exact-exponent state) fractional-digits))
+                      (limit-quotient (floor limit 10))
+                      (limit-remainder (mod limit 10)))
+                 (loop with count = 0
+                       while (and (ps-peek state)
+                                  (ascii-json-digit-p (ps-peek state)))
+                       for digit = (ascii-json-digit-value (ps-peek state))
+                       do (unless (or coefficient-zero-p exponent-overflow-p)
+                            (if (or (> exponent limit-quotient)
+                                    (and (= exponent limit-quotient)
+                                         (> digit limit-remainder)))
+                                (setf exponent-overflow-p t)
+                                (setf exponent (+ (* exponent 10) digit))))
+                          (advance)
+                          (incf count)
+                       finally (return count)))))
+      (when (eql (ps-peek state) #\-)
+        (setf negative-p t)
+        (advance))
       (unless (and (ps-peek state) (ascii-json-digit-p (ps-peek state)))
         (parse-error-here state "decimal digit"))
-      (if (eql (ps-peek state) #\0) (advance) (require-digits))
+      (if (eql (ps-peek state) #\0)
+          (advance)
+          (require-coefficient-digits nil))
       (when (eql (ps-peek state) #\.)
         (setf floating-point-p t)
         (advance)
-        (require-digits))
+        (require-coefficient-digits t))
       (when (member (ps-peek state) +json-exponent-markers+)
         (setf floating-point-p t)
         (advance)
-        (when (member (ps-peek state) +json-sign-characters+) (advance))
-        (require-digits))
-      (values (subseq (ps-text state) start (ps-pos state)) floating-point-p))))
+        (when (member (ps-peek state) +json-sign-characters+)
+          (setf exponent-negative-p (eql (ps-peek state) #\-))
+          (advance))
+        (when (zerop (exponent-digits))
+          (parse-error-here state "decimal digit")))
+      (when exponent-negative-p (setf exponent (- exponent)))
+      (let ((scale (- exponent fractional-digits)))
+        (values start (ps-pos state) floating-point-p negative-p
+                coefficient-zero-p scale
+                (or coefficient-zero-p
+                    (and (not exponent-overflow-p)
+                         (<= (abs scale) (ps-max-exact-exponent state)))))))))
 
-(defun decode-integer-token (token)
-  "The exact integer value of an integer TOKEN."
-  (let ((value 0)
-        (index 0)
-        (negative-p nil))
-    (when (char= (char token 0) #\-)
+(defun decode-integer-range (text start end)
+  "Return the exact integer represented by TEXT[start,end)."
+  (let ((value 0) (index start) (negative-p nil))
+    (when (char= (char text index) #\-)
       (setf negative-p t)
       (incf index))
-    (loop while (< index (length token))
-          do (setf value (+ (* value 10) (ascii-json-digit-value (char token index))))
+    (loop while (< index end)
+          do (setf value (+ (* value 10) (ascii-json-digit-value (char text index))))
              (incf index))
     (if negative-p (- value) value)))
 
-(defun decode-float-token (state token)
-  "Decode a floating-point TOKEN, preferring a native double-float read but
-falling back to an exact rational when the read is lossy or the magnitude is
-out of float range.  Signed zero is preserved."
-  (multiple-value-bind (negative-p coefficient-zero-p)
-      (number-token-properties state token)
-    (if coefficient-zero-p
-        (if negative-p -0.0d0 0.0d0)
-        (let ((*read-default-float-format* 'double-float)
-              (*read-eval* nil))
-          (handler-case
-              (multiple-value-bind (value consumed) (read-from-string token nil nil)
-                (if (and value (= consumed (length token)))
-                    (handler-case
-                        (progn
-                          (rational value)
-                          (if (zerop value) (exact-number-value state token) value))
-                      (error () (exact-number-value state token)))
-                    (parse-error-here state "JSON number")))
-            (error () (exact-number-value state token)))))))
+(defun decode-float-range
+    (state text start end negative-p coefficient-zero-p scale scale-valid-p)
+  "Decode TEXT[start,end) to a correctly rounded double, retaining exact extremes."
+  (unless scale-valid-p
+    (parse-error-here state "number scale within MAX-EXACT-EXPONENT"))
+  (if coefficient-zero-p
+      (if negative-p -0.0d0 0.0d0)
+      (labels ((round-quotient-even (numerator denominator)
+                 (multiple-value-bind (quotient remainder)
+                     (floor numerator denominator)
+                   (let ((twice-remainder (* 2 remainder)))
+                     (if (or (> twice-remainder denominator)
+                             (and (= twice-remainder denominator) (oddp quotient)))
+                         (1+ quotient)
+                         quotient))))
+               (floor-log2-ratio (numerator denominator)
+                 (let ((exponent (- (integer-length numerator)
+                                    (integer-length denominator))))
+                   (when (if (minusp exponent)
+                             (< (ash numerator (- exponent)) denominator)
+                             (< numerator (ash denominator exponent)))
+                     (decf exponent))
+                   exponent))
+               (scaled-rounded (numerator denominator shift)
+                 (if (minusp shift)
+                     (round-quotient-even numerator (ash denominator (- shift)))
+                     (round-quotient-even (ash numerator shift) denominator))))
+        (handler-case
+            (let ((coefficient 0)
+                  (index (if negative-p (1+ start) start)))
+              (loop while (< index end)
+                    for character = (char text index)
+                    until (member character +json-exponent-markers+)
+                    do (unless (char= character #\.)
+                         (setf coefficient (+ (* coefficient 10)
+                                              (ascii-json-digit-value character))))
+                       (incf index))
+              (let* ((power (expt 10 (abs scale)))
+                     (numerator (if (minusp scale) coefficient (* coefficient power)))
+                     (denominator (if (minusp scale) power 1))
+                     (binary-exponent (floor-log2-ratio numerator denominator))
+                     (rounded
+                       (if (< binary-exponent -1022)
+                           (scaled-rounded numerator denominator 1074)
+                           (scaled-rounded numerator denominator (- 52 binary-exponent)))))
+                (cond
+                  ((or (> binary-exponent 1023) (zerop rounded))
+                   (exact-number-range-value text start end negative-p
+                                             coefficient-zero-p scale))
+                  ((< binary-exponent -1022)
+                   (let ((value (scale-float (float rounded 1.0d0) -1074)))
+                     (if negative-p (- value) value)))
+                  (t
+                   (when (= rounded (ash 1 53))
+                     (setf rounded (ash 1 52))
+                     (incf binary-exponent))
+                   (if (> binary-exponent 1023)
+                       (exact-number-range-value text start end negative-p
+                                                 coefficient-zero-p scale)
+                       (let ((value (scale-float (float rounded 1.0d0)
+                                                 (- binary-exponent 52))))
+                         (if negative-p (- value) value)))))))
+          (error ()
+            (exact-number-range-value text start end negative-p
+                                      coefficient-zero-p scale))))))
 
 (defun scan-integer-fast (state)
   "Fast path for a plain JSON integer parsed without a NUMBER-DECODER: scan it
@@ -224,14 +267,20 @@ for those cases."
       (if negative-p (- value) value))))
 
 (defun parse-number (state)
-  "Parse a JSON number, honouring a user NUMBER-DECODER when present."
-  (or (and (not (ps-number-decoder state))
-           (scan-integer-fast state))
-      (multiple-value-bind (token floating-point-p) (scan-number state)
-        (cond
-          ((ps-number-decoder state)
-           (with-json-callback (value state "NUMBER-DECODER"
-                                      (ps-number-decoder state) token (not floating-point-p))
-             value))
-          (floating-point-p (decode-float-token state token))
-          (t (decode-integer-token token))))))
+  "Parse a JSON number, allocating a raw token only for NUMBER-DECODER."
+  (or (and (not (ps-number-decoder state)) (scan-integer-fast state))
+      (multiple-value-bind
+            (start end floating-point-p negative-p coefficient-zero-p scale scale-valid-p)
+          (scan-number state)
+        (let ((text (ps-text state)))
+          (cond
+            ((ps-number-decoder state)
+             (let ((token (subseq text start end)))
+               (with-json-callback (value state "NUMBER-DECODER"
+                                          (ps-number-decoder state) token
+                                          (not floating-point-p))
+                 value)))
+            (floating-point-p
+             (decode-float-range state text start end negative-p
+                                 coefficient-zero-p scale scale-valid-p))
+            (t (decode-integer-range text start end)))))))

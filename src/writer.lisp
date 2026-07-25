@@ -44,7 +44,7 @@ output stream, signalling a serialization error otherwise."
         (*json-null-value* null-value)
         (*json-false-value* false-value)
         (*json-number-encoder* (resolve-number-encoder number-encoder))
-        (*json-active-aggregates* (make-hash-table :test #'eq))
+        (*json-active-aggregates* nil)
         (*json-serialization-path* nil))
     (validate-writer-options indent max-depth max-elements max-output-length)
     (write-json-value value 0)
