@@ -25,6 +25,11 @@ listed on the [GitHub releases page](https://github.com/nerima-lisp/cl-json-kit/
 - Bumped the `cl-weave` test dependency from v0.10.0 to v1.0.0 (`flake.lock`
   refreshed accordingly); required by `with-soft-assertions` below, which
   v0.10.0 does not export.
+- `flake.nix`'s Nix packages now derive their version from `cl-json-kit.asd`'s
+  `:version` form at eval time instead of duplicating it as a separate
+  hardcoded string in two places, matching the pattern already used by the
+  sibling `nerima-lisp/cl-weave` flake. Reformatted `cl-json-kit/test`'s
+  dense single-line `:perform` form across multiple lines.
 - Split `reader-test.lisp` and `writer-test.lisp` into 13 per-feature test
   files along their existing `describe`-block boundaries.
 - Test suite adopts previously-unused `cl-weave` features: a
