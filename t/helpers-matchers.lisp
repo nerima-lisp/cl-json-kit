@@ -1,4 +1,4 @@
-;;;; t/matchers.lisp
+;;;; t/helpers-matchers.lisp
 ;;;;
 ;;;; Domain-specific expectations and generators shared by every spec file, so
 ;;;; the specs read in the vocabulary of the library ("parses as", "stringifies

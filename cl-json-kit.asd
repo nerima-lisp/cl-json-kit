@@ -46,7 +46,7 @@ correctly, and parsing can be bounded with a timeout."
   :pathname "t"
   :serial t
   :components ((:file "package")
-               (:file "matchers")
+               (:file "helpers-matchers")
                (:file "public-api-test")
                (:file "conditions-test")
                (:file "reader-scalars-test")
