@@ -102,7 +102,8 @@ carry attacker-influenced data is truncated and control-character-escaped before
 it is stored, so reporting the condition cannot itself become an attack surface.")
   (:report
    (lambda (condition stream)
-     (format stream "~A parse error at line ~D, column ~D (position ~D)~@[ at ~S~]~@[: expected ~A~]"
+     (format stream
+             "~A parse error at line ~D, column ~D (position ~D)~@[ at ~S~]~@[: expected ~A~]"
              (json-parse-error-context condition)
              (json-parse-error-line condition)
              (json-parse-error-column condition)
