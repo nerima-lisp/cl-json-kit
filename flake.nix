@@ -2,7 +2,29 @@
   description = "Dependency-free, SBCL-first JSON library for Common Lisp";
 
   inputs = {
+    # nixos-unstable, not nixpkgs-unstable: it advances only after the NixOS
+    # release tests pass, so it is less likely to land a broken build.
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+    # `inputs.nixpkgs.follows` is mandatory on every input: without it each one
+    # drags in its own nixpkgs, inflating flake.lock and rebuilding the same
+    # derivations.
+
+    # The org flake preset. Everything this file used to spell out by hand --
+    # the `.asd` version extraction, `forAllSystems`, the treefmt eval wired to
+    # both `formatter` and `checks.formatting`, the mkdocs package plus its
+    # check, the run-tests.lisp gate and the `apps.test`/`apps.default` pair --
+    # is the single `mkPackageFlake` call below, so none of it can drift from
+    # the other 20 repositories.
+    #
+    # Pinned to a release TAG, never to a branch: a bare
+    # `github:nerima-lisp/cl-nix-forge` follows that repository's default
+    # branch, so an upstream push to main would change this build without
+    # warning.
+    cl-nix-forge = {
+      url = "github:nerima-lisp/cl-nix-forge/v0.3.0";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     cl-weave = {
       url = "github:nerima-lisp/cl-weave/v1.0.0";
@@ -16,14 +38,16 @@
   };
 
   outputs =
-    inputs@{
+    {
       self,
       nixpkgs,
+      cl-nix-forge,
       cl-weave,
       treefmt-nix,
-      ...
     }:
     let
+      lib = nixpkgs.lib;
+
       # Only what is verified: x86_64-linux by CI, aarch64-darwin by the
       # maintainer's local `nix flake check`. aarch64-linux and x86_64-darwin
       # are not declared because nothing runs them, and a platform no runner
@@ -33,167 +57,131 @@
         "x86_64-linux"
         "aarch64-darwin"
       ];
-      forAllSystems = nixpkgs.lib.genAttrs systems;
-      sourceRegistry = "${cl-weave}//:${self}//";
+    in
+    # `mkPackageFlake` spans systems -- it obtains a `pkgs` and its own
+    # cl-nix-forge instance per entry in `systems` -- so the per-system `lib`
+    # this function is taken from contributes nothing but the function itself.
+    cl-nix-forge.lib.${builtins.head systems}.mkPackageFlake {
+      inherit self systems nixpkgs;
+
+      pname = "cl-json-kit";
 
       # Single source of truth for the package version: the `:version` form in
-      # cl-json-kit.asd. A release only ever edits the .asd file and every Nix
-      # package (default + docs) follows automatically. Nix regexes are
-      # whole-string anchored and `.` never spans newlines, so the version is
-      # extracted line-by-line rather than with one multi-line match.
-      version =
-        let
-          lines = nixpkgs.lib.splitString "\n" (builtins.readFile ./cl-json-kit.asd);
-          versionLine = builtins.head (
-            builtins.filter (line: builtins.match "[[:space:]]*:version \"[^\"]*\"" line != null) lines
-          );
-        in
-        builtins.head (builtins.match "[[:space:]]*:version \"([^\"]*)\"" versionLine);
+      # cl-json-kit.asd. A release only ever edits the .asd file and every
+      # derivation carrying a version -- the package, the docs site, and both
+      # store paths -- follows automatically. There is deliberately no
+      # `version` argument to pass.
+      asd = ./cl-json-kit.asd;
 
-      # treefmt drives `nix fmt` and the `checks.<system>.formatting` gate.
-      # Scope is Nix only: nixfmt (RFC-style) is a zero-footgun, low-diff
-      # formatter, whereas YAML formatters mangle the GitHub Actions `on:`
-      # key and Markdown reformatting would churn the whole in-flight docs
-      # tree -- neither is "low-cost", so both are intentionally left out.
-      treefmtEval = forAllSystems (
-        system:
-        treefmt-nix.lib.evalModule nixpkgs.legacyPackages.${system} {
-          projectRootFile = "flake.nix";
-          programs.nixfmt.enable = true;
-        }
-      );
-    in
-    {
-      packages = forAllSystems (
-        system:
-        let
-          pkgs = nixpkgs.legacyPackages.${system};
-        in
-        rec {
-          cl-json-kit = pkgs.sbcl.buildASDFSystem {
-            pname = "cl-json-kit";
-            inherit version;
-            src = self;
-            systems = [ "cl-json-kit" ];
-          };
-          default = cl-json-kit;
+      # Spelled out rather than left to `mkPackageFlake`'s documented default
+      # of `self`, because that default does not evaluate: a flake's `self` is
+      # an attrset with an `outPath`, and `lib.fileset` refuses string-like
+      # values. `./.` is the same directory as a path literal. `self` is still
+      # what the preset hands the treefmt gate, which wants the UNFILTERED tree
+      # and takes a store path happily.
+      root = ./.;
 
-          # Rendered documentation site (Material for MkDocs).
-          # Build fully offline: Material for MkDocs bundles all of its assets,
-          # so no network access is required inside the Nix sandbox. --strict
-          # promotes broken links and unlisted pages to build failures.
-          docs = pkgs.stdenvNoCC.mkDerivation {
-            pname = "cl-json-kit-docs";
-            inherit version;
-            src = pkgs.lib.fileset.toSource {
-              root = ./docs;
-              fileset = pkgs.lib.fileset.unions [
-                ./docs/mkdocs.yml
-                ./docs/src
-              ];
-            };
-            nativeBuildInputs = [ pkgs.python3Packages.mkdocs-material ];
-            buildPhase = ''
-              runHook preBuild
-              mkdocs build --strict --config-file mkdocs.yml --site-dir "$out"
-              runHook postBuild
-            '';
-            dontInstall = true;
-            meta = {
-              description = "Rendered MkDocs (Material) documentation for cl-json-kit";
-              homepage = "https://github.com/nerima-lisp/cl-json-kit";
-              license = pkgs.lib.licenses.mit;
-            };
-          };
-        }
-      );
+      meta = {
+        description = "Dependency-free JSON reader and writer for Common Lisp strings and character streams";
+        homepage = "https://github.com/nerima-lisp/cl-json-kit";
+        license = lib.licenses.mit;
+        platforms = lib.platforms.unix;
+      };
 
-      # `nix fmt` entry point.
-      formatter = forAllSystems (system: treefmtEval.${system}.config.build.wrapper);
+      # cl-weave is a dependency of `cl-json-kit/test` and of nothing else (see
+      # cl-json-kit.asd), so it is a CHECK dependency: it must not enter the
+      # library's closure or the overlay's `pkgs.cl-json-kit`. These are BUILT
+      # DERIVATIONS, never CL_SOURCE_REGISTRY strings -- assembling that
+      # registry is cl-nix-forge's job and it does it transitively, which is
+      # what replaces the hand-rolled `"${cl-weave}//:${self}//"` this file
+      # used to thread through the check, the app and the devShell separately.
+      #
+      # cl-weave is built here rather than taken as `cl-weave.packages.*`
+      # because v1.0.0 predates its own migration: its `packages.default` is
+      # the delivered CLI binary, not an ASDF system. Do NOT reach for
+      # `fromDerivation` on the flake input instead -- that puts cl-weave's
+      # uncompiled SOURCE on the registry, and ASDF then tries to write its
+      # fasls next to those sources, inside the read-only Nix store. Once
+      # cl-weave is migrated and tagged v2.0.0, this whole block collapses to
+      #   lispCheckDependencies = ctx: [ cl-weave.packages.${ctx.system}.cl-weave ];
+      lispCheckDependencies = ctx: [
+        (ctx.cl.lispDerivation {
+          pname = "cl-weave";
+          version = ctx.cl.fromAsdSystem "${cl-weave}/cl-weave.asd";
+          src = cl-weave;
+          lispSystem = "cl-weave";
+        })
+      ];
 
-      checks = forAllSystems (
-        system:
-        let
-          pkgs = nixpkgs.legacyPackages.${system};
-        in
-        {
-          default =
-            pkgs.runCommand "cl-json-kit-tests"
-              {
-                nativeBuildInputs = [
-                  pkgs.sbcl
-                  pkgs.coreutils
-                ];
-                CL_SOURCE_REGISTRY = sourceRegistry;
-              }
-              ''
-                export HOME="$TMPDIR/home"
-                mkdir -p "$HOME" "$out"
-                timeout 120 sbcl --script ${self}/run-tests.lisp
-                touch "$out/passed"
-              '';
+      # Drives BOTH `checks.default` and `apps.test`, from this one number, so
+      # the command a contributor runs by hand and the gate CI runs cannot
+      # drift apart -- the two `timeout 120` invocations this replaces were
+      # separate literals that could.
+      timeoutSeconds = 120;
 
-          # Fails `nix flake check` when any tracked file is unformatted,
-          # turning the formatter into an enforced CI gate.
-          formatting = treefmtEval.${system}.config.build.check self;
+      # docs/mkdocs.yml + docs/src/, built with `--strict` so a broken link or
+      # a page missing from the nav is a build failure. Material for MkDocs
+      # bundles all of its assets, so the build needs no network access inside
+      # the Nix sandbox.
+      #
+      # `checks.docs` comes with it, and is the point: without that gate the
+      # docs are only ever built by the publish workflow, which runs after a
+      # merge to main -- meaning such a break is discovered as a failed deploy
+      # rather than as a failed pull request.
+      docs.root = ./docs;
 
-          # The docs package builds with `mkdocs --strict`, so a broken link or
-          # a page missing from the nav fails the build.  Without this the docs
-          # are only ever built by the publish workflow, which runs after a
-          # merge to main -- meaning such a break is discovered as a failed
-          # deploy rather than as a failed pull request.
-          docs = self.packages.${system}.docs;
-        }
-      );
+      # ONE treefmt evaluation drives `nix fmt` and the `checks.formatting`
+      # gate, so the formatter and CI can never disagree about what
+      # "formatted" means, and any unformatted tracked file fails
+      # `nix flake check`. `evalModule` is passed in rather than closed over so
+      # this repository picks its own treefmt-nix version. Scope stays the
+      # preset's Nix-only default, which is this repo's existing scope and for
+      # the same reasons: nixfmt (RFC-style) is a zero-footgun, low-diff
+      # formatter, whereas YAML formatters mangle the GitHub Actions `on:` key
+      # and Markdown reformatting would churn the whole docs tree.
+      treefmt.evalModule = treefmt-nix.lib.evalModule;
 
-      apps = forAllSystems (
-        system:
-        let
-          pkgs = nixpkgs.legacyPackages.${system};
-          test = pkgs.writeShellApplication {
-            name = "cl-json-kit-test";
-            runtimeInputs = [
-              pkgs.sbcl
-              pkgs.coreutils
-            ];
-            text = ''
-              export CL_SOURCE_REGISTRY="${sourceRegistry}"
-              exec timeout 120 sbcl --script ${self}/run-tests.lisp
-            '';
-          };
-        in
-        {
-          default = {
-            type = "app";
-            program = "${test}/bin/cl-json-kit-test";
-          };
-          test = {
-            type = "app";
-            program = "${test}/bin/cl-json-kit-test";
-          };
-        }
-      );
-
-      devShells = forAllSystems (
-        system:
-        let
-          pkgs = nixpkgs.legacyPackages.${system};
+      overrideOutputs = ctx: {
+        # The preset's generated devShell is `mkDevShell { drv = ctx.package; }`,
+        # and `ctx.package` is built with `doCheck = false`, whose resolved
+        # CL_SOURCE_REGISTRY therefore omits `lispCheckDependencies`. That
+        # shell cannot run this repository's own test suite -- the very suite
+        # the preset's `checks.default` and `apps.test` run -- because
+        # `cl-json-kit/test` depends on cl-weave. docs/src/contributing.md
+        # documents `nix develop` followed by `sbcl --script run-tests.lisp`,
+        # and the flake this replaces supported it by putting cl-weave on the
+        # devShell's registry directly.
+        #
+        # `.enableCheck` is the same derivation with `doCheck = true`, which is
+        # what `mkScriptCheck` builds `checks.default` from, so the shell's
+        # registry is exactly the check's. Nothing is built by naming it:
+        # `mkShell`'s `inputsFrom` takes inputs, not outputs.
+        #
+        # `devShellPackages` is deliberately NOT also used -- overriding the
+        # output would ignore it, and one silently-dead argument is worse than
+        # the extra line here. This whole block collapses back to
+        # `devShellPackages = ctx: [ ... ];` once `mkPackageFlake` builds its
+        # own devShell from the check-enabled derivation, which is what every
+        # package with a test-only sibling dependency needs.
+        devShells.default = ctx.cl.mkDevShell {
+          drv = ctx.package.enableCheck;
           # SBCL with the competitor JSON libraries preloaded, so
           # benchmark/competitors.lisp can compare cl-json-kit against them
-          # under `nix develop` (see benchmark/README.md).
-          benchmarkSbcl = pkgs.sbcl.withPackages (ps: [
-            ps.jzon
-            ps.jonathan
-            ps.jsown
-            ps.yason
-          ]);
-        in
-        {
-          default = pkgs.mkShell {
-            packages = [ benchmarkSbcl ];
-            CL_SOURCE_REGISTRY = sourceRegistry;
-          };
-        }
-      );
+          # under `nix develop` (see benchmark/README.md). `mkShell` puts
+          # `packages` ahead of everything from `inputsFrom` on PATH, so this
+          # wrapped SBCL wins over the plain one the derivation pulls in, and
+          # nixpkgs builds the wrapper with `--prefix CL_SOURCE_REGISTRY`, so
+          # its libraries are prepended to the registry above rather than
+          # replacing it.
+          extraPackages = [
+            (ctx.pkgs.sbcl.withPackages (ps: [
+              ps.jzon
+              ps.jonathan
+              ps.jsown
+              ps.yason
+            ]))
+          ];
+        };
+      };
     };
 }
