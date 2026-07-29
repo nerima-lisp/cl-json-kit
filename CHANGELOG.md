@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-07-29
+
+No public API or observable behavior changed in this release; it is an
+internal hot-path locality pass over the reader and writer, plus a CI chore.
+
 ### Changed
 
 - `parse-number`'s fast plain-integer path no longer discards its progress
