@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- `parse-number`'s fast plain-integer path no longer discards its progress
+  when the input turns out to be a float: `scan-number` now accepts an
+  optional resume point (position, sign, and coefficient so far) and
+  continues scanning from there instead of rescanning the number from its
+  start.
+- `read-string-escape`'s `\uXXXX` decoding folds both hex4 reads (a value,
+  and a low surrogate on a high surrogate) into local functions evaluated in
+  one pass, instead of a second call back into the escape dispatcher.
+- `validate-object-keys` skips its own duplicate-tracking hash table when the
+  argument hash table's `:test` is `EQUAL` or `EQUALP`, since such a table
+  already guarantees unique keys under that test.
+- Bound the `flake-update` workflow's `update` job to `timeout-minutes: 15`,
+  matching the wall-clock bound already applied to `ci.yml`'s `check` job,
+  and fixed a `flake.nix` comment left stale by the earlier platform-support
+  scope-down.
+
 ## [1.0.0] - 2026-07-25
 
 The first stable release. The public API does not change here; what changes is
