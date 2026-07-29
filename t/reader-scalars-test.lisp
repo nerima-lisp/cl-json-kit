@@ -24,6 +24,22 @@
       (text)
     (expect (numberp (parse text)) :to-be-truthy))
 
+  (it "keeps integer and floating prefix boundaries exact"
+    (dolist (case (list (list "42 tail" 42 2)
+                        (list "42.5 tail" 42.5d0 4)
+                        (list "42e-1 tail" 4.2d0 5)
+                        (list "9223372036854775808 tail" 9223372036854775808 19)))
+      (destructuring-bind (text expected end) case
+        (multiple-value-bind (value actual-end) (parse-prefix text)
+          (expect value :to-be expected)
+          (expect actual-end :to-be end))))
+    (multiple-value-bind (value end) (parse-prefix "-0e+3 tail")
+      (expect value :to-be-type-of (quote double-float))
+      (expect (zerop value) :to-be-truthy)
+      (expect (= (float-sign value) -1.0d0) :to-be-truthy)
+      (expect end :to-be 5)))
+
+
   (it-each (("01") ("-01") ("+1") (".1") ("1.") ("1e") ("1e+") ("--1"))
       "rejects the malformed number ~S"
       (text)
