@@ -24,8 +24,6 @@
       ...
     }:
     let
-      # CI builds and tests only x86_64-linux, so that is the sole declared
-      # system: the flake never advertises a platform it does not verify.
       # Only what is verified: x86_64-linux by CI, aarch64-darwin by the
       # maintainer's local `nix flake check`. aarch64-linux and x86_64-darwin
       # are not declared because nothing runs them, and a platform no runner
