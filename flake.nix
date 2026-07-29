@@ -22,7 +22,7 @@
     # branch, so an upstream push to main would change this build without
     # warning.
     cl-nix-forge = {
-      url = "github:nerima-lisp/cl-nix-forge/v0.3.0";
+      url = "github:nerima-lisp/cl-nix-forge/v0.4.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -141,47 +141,27 @@
       # and Markdown reformatting would churn the whole docs tree.
       treefmt.evalModule = treefmt-nix.lib.evalModule;
 
-      overrideOutputs = ctx: {
-        # The preset's generated devShell is `mkDevShell { drv = ctx.package; }`,
-        # and `ctx.package` is built with `doCheck = false`, whose resolved
-        # CL_SOURCE_REGISTRY therefore omits `lispCheckDependencies`. That
-        # shell cannot run this repository's own test suite -- the very suite
-        # the preset's `checks.default` and `apps.test` run -- because
-        # `cl-json-kit/test` depends on cl-weave. docs/src/contributing.md
-        # documents `nix develop` followed by `sbcl --script run-tests.lisp`,
-        # and the flake this replaces supported it by putting cl-weave on the
-        # devShell's registry directly.
-        #
-        # `.enableCheck` is the same derivation with `doCheck = true`, which is
-        # what `mkScriptCheck` builds `checks.default` from, so the shell's
-        # registry is exactly the check's. Nothing is built by naming it:
-        # `mkShell`'s `inputsFrom` takes inputs, not outputs.
-        #
-        # `devShellPackages` is deliberately NOT also used -- overriding the
-        # output would ignore it, and one silently-dead argument is worse than
-        # the extra line here. This whole block collapses back to
-        # `devShellPackages = ctx: [ ... ];` once `mkPackageFlake` builds its
-        # own devShell from the check-enabled derivation, which is what every
-        # package with a test-only sibling dependency needs.
-        devShells.default = ctx.cl.mkDevShell {
-          drv = ctx.package.enableCheck;
-          # SBCL with the competitor JSON libraries preloaded, so
-          # benchmark/competitors.lisp can compare cl-json-kit against them
-          # under `nix develop` (see benchmark/README.md). `mkShell` puts
-          # `packages` ahead of everything from `inputsFrom` on PATH, so this
-          # wrapped SBCL wins over the plain one the derivation pulls in, and
-          # nixpkgs builds the wrapper with `--prefix CL_SOURCE_REGISTRY`, so
-          # its libraries are prepended to the registry above rather than
-          # replacing it.
-          extraPackages = [
-            (ctx.pkgs.sbcl.withPackages (ps: [
-              ps.jzon
-              ps.jonathan
-              ps.jsown
-              ps.yason
-            ]))
-          ];
-        };
-      };
+      # SBCL with the competitor JSON libraries preloaded, so
+      # benchmark/competitors.lisp can compare cl-json-kit against them under
+      # `nix develop` (see benchmark/README.md). `mkShell` puts `packages`
+      # ahead of everything from `inputsFrom` on PATH, so this wrapped SBCL
+      # wins over the plain one the derivation pulls in, and nixpkgs builds the
+      # wrapper with `--prefix CL_SOURCE_REGISTRY`, so its libraries are
+      # prepended to the shell's registry rather than replacing it.
+      #
+      # cl-weave is deliberately NOT named here. `mkPackageFlake` builds its
+      # dev shell from the CHECK-ENABLED derivation, so `lispCheckDependencies`
+      # are already on that shell's registry -- which is what makes `nix
+      # develop` followed by `sbcl --script run-tests.lisp`, the loop
+      # docs/src/contributing.md documents, work at all. Repeating cl-weave
+      # here would be a second source of truth for it.
+      devShellPackages = ctx: [
+        (ctx.pkgs.sbcl.withPackages (ps: [
+          ps.jzon
+          ps.jonathan
+          ps.jsown
+          ps.yason
+        ]))
+      ];
     };
 }
