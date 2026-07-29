@@ -6,29 +6,46 @@
 (in-package #:json-kit)
 
 (defconstant +default-maximum-serialization-depth+ 512)
+
 (defconstant +default-maximum-serialization-elements+ 1000000)
+
 (defconstant +default-maximum-output-length+ 16777216)
 
 (defvar *json-output-stream*)
+
 (defvar *json-output-count*)
+
 (defvar *json-maximum-output-length*)
+
 (defvar *json-maximum-depth*)
+
 (defvar *json-maximum-elements*)
+
 (defvar *json-pretty*)
+
 (defvar *json-indent*)
+
 (defvar *json-sort-keys*)
+
 (defvar *json-null-value*)
+
 (defvar *json-false-value*)
+
 (defvar *json-number-encoder*)
+
 (defvar *json-active-aggregates*)
+
 (defvar *json-serialization-path* nil)
 
 (defun serialization-error (control &rest arguments)
   "Signal a JSON-SERIALIZATION-ERROR describing the current path and a message
 built from CONTROL and ARGUMENTS."
-  (error (bounded-json-serialization-error
-          :message (apply #'format nil control arguments)
-          :path (reverse *json-serialization-path*))))
+  (error
+    (bounded-json-serialization-error
+      :message
+      (apply #'format nil control arguments)
+      :path
+      (reverse *json-serialization-path*))))
 
 ;;; ---------------------------------------------------------------------
 ;;; Option validation
@@ -41,31 +58,37 @@ built from CONTROL and ARGUMENTS."
   (unless (and (integerp indent) (not (minusp indent)))
     (serialization-error "INDENT must be a non-negative integer, not ~S" indent))
   (unless (valid-limit-p maximum-depth)
-    (serialization-error "MAX-DEPTH must be NIL or a non-negative integer, not ~S"
-                         maximum-depth))
+    (serialization-error
+      "MAX-DEPTH must be NIL or a non-negative integer, not ~S"
+      maximum-depth))
   (unless (valid-limit-p maximum-elements)
-    (serialization-error "MAX-ELEMENTS must be NIL or a non-negative integer, not ~S"
-                         maximum-elements))
+    (serialization-error
+      "MAX-ELEMENTS must be NIL or a non-negative integer, not ~S"
+      maximum-elements))
   (unless (valid-limit-p maximum-output-length)
-    (serialization-error "MAX-OUTPUT-LENGTH must be NIL or a non-negative integer, not ~S"
-                         maximum-output-length)))
+    (serialization-error
+      "MAX-OUTPUT-LENGTH must be NIL or a non-negative integer, not ~S"
+      maximum-output-length)))
 
 (defun resolve-number-encoder (designator)
   "Coerce a number-encoder DESIGNATOR (NIL, a function, or an fbound symbol)
 into a function or NIL."
-  (resolve-callback-designator designator
+  (resolve-callback-designator
+    designator
     (serialization-error "NUMBER-ENCODER must be a function designator")))
 
 ;;; ---------------------------------------------------------------------
 ;;; Bounded output primitives
 ;;; ---------------------------------------------------------------------
-(defun reserve-output (length)
-  "Account for LENGTH characters of pending output, signalling before the
-configured maximum is exceeded."
-  (when (and *json-maximum-output-length*
-             (> length (- *json-maximum-output-length* *json-output-count*)))
-    (serialization-error "serialized output exceeds the configured maximum length"))
-  (incf *json-output-count* length))
+(progn
+  (declaim (inline reserve-output emit-string emit-character))
+  (defun reserve-output (length)
+    "Account for LENGTH characters of pending output, signalling before the configured maximum is exceeded."
+    (when (and
+        *json-maximum-output-length*
+        (> length (- *json-maximum-output-length* *json-output-count*)))
+      (serialization-error "serialized output exceeds the configured maximum length"))
+    (incf *json-output-count* length)))
 
 (defun emit-string (string)
   (let ((length (length string)))
@@ -87,9 +110,9 @@ configured maximum is exceeded."
   (emit-character #\Newline)
   (let ((count (* *json-indent* level)))
     (reserve-output count)
-    (dotimes (index count)
-      (declare (ignore index))
-      (write-char #\Space *json-output-stream*))))
+    (loop repeat
+          count
+          do (write-char #\Space *json-output-stream*))))
 
 (defun ensure-depth (level)
   (when (and *json-maximum-depth* (> level *json-maximum-depth*))

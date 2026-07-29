@@ -48,16 +48,23 @@ circular list and enforcing MAX-ELEMENTS as it counts."
 (defun validate-object-keys (table)
   "Ensure TABLE has string keys, no duplicates, and is within MAX-ELEMENTS."
   (ensure-element-count (hash-table-count table))
-  (let ((seen (make-hash-table :test #'equal)))
-    (maphash
-     (lambda (key value)
-       (declare (ignore value))
-       (unless (stringp key)
-         (serialization-error "JSON object keys must be strings, got ~S" key))
-       (when (gethash key seen)
-         (serialization-error "Duplicate JSON object key ~S" key))
-       (setf (gethash key seen) t))
-     table)))
+  (flet ((validate-key (key)
+           (unless (stringp key)
+             (serialization-error "JSON object keys must be strings, got ~S" key))))
+    (if (member (hash-table-test table) '(equal equalp))
+        (maphash (lambda (key value)
+                   (declare (ignore value))
+                   (validate-key key))
+                 table)
+        (let ((seen (make-hash-table :test #'equal)))
+          (maphash
+           (lambda (key value)
+             (declare (ignore value))
+             (validate-key key)
+             (when (gethash key seen)
+               (serialization-error "Duplicate JSON object key ~S" key))
+             (setf (gethash key seen) t))
+           table)))))
 
 (defun validated-object-pairs (table)
   "Validated TABLE pairs sorted by key, for deterministic :SORT-KEYS output."

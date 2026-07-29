@@ -107,6 +107,17 @@
             (gethash (copy-seq "same") table) 2)
       (signals json-serialization-error (stringify table))))
 
+  (it "serializes an equalp hash table with its single coalesced member"
+    (let ((table (make-hash-table :test #'equalp)))
+      (setf (gethash "same" table) 1
+            (gethash "SAME" table) 2)
+      (let ((decoded (parse (stringify table))))
+        (expect (= (hash-table-count decoded) 1) :to-be-truthy)
+        (expect (= (loop for value being the hash-values of decoded
+                         return value)
+                   2)
+                :to-be-truthy))))
+
   (it "creates cycle tracking lazily and clears marks on exit"
     (let ((seen :unset))
       (expect

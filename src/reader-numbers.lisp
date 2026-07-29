@@ -53,12 +53,15 @@ coefficient out of one number token."
 ;;; ---------------------------------------------------------------------
 ;;; Scanning and decoding
 ;;; ---------------------------------------------------------------------
-(defun scan-number (state)
+(defun scan-number
+    (state &optional resume-start resume-negative-p
+                     resume-coefficient resume-coefficient-zero-p)
   "Validate a JSON number and return its range plus metadata needed for decoding."
-  (let ((start (ps-pos state))
-        (floating-point-p nil)
-        (negative-p nil)
-        (coefficient-zero-p t)
+  (let ((start (or resume-start (ps-pos state)))
+        (floating-point-p (not (null resume-start)))
+        (negative-p (if resume-start resume-negative-p nil))
+        (coefficient-zero-p (if resume-start resume-coefficient-zero-p t))
+        (coefficient (if resume-start resume-coefficient 0))
         (fractional-digits 0)
         (exponent 0)
         (exponent-negative-p nil)
@@ -72,7 +75,8 @@ coefficient out of one number token."
                      while (and (ps-peek state)
                                 (ascii-json-digit-p (ps-peek state)))
                      for digit = (ascii-json-digit-value (ps-peek state))
-                     do (unless (zerop digit)
+                     do (setf coefficient (+ (* coefficient 10) digit))
+                        (unless (zerop digit)
                           (setf coefficient-zero-p nil))
                         (when fractional-p (incf fractional-digits))
                         (advance)
@@ -98,14 +102,15 @@ coefficient out of one number token."
                           (advance)
                           (incf count)
                        finally (return count)))))
-      (when (eql (ps-peek state) #\-)
-        (setf negative-p t)
-        (advance))
-      (unless (and (ps-peek state) (ascii-json-digit-p (ps-peek state)))
-        (parse-error-here state "decimal digit"))
-      (if (eql (ps-peek state) #\0)
-          (advance)
-          (require-coefficient-digits nil))
+      (unless resume-start
+        (when (eql (ps-peek state) #\-)
+          (setf negative-p t)
+          (advance))
+        (unless (and (ps-peek state) (ascii-json-digit-p (ps-peek state)))
+          (parse-error-here state "decimal digit"))
+        (if (eql (ps-peek state) #\0)
+            (advance)
+            (require-coefficient-digits nil)))
       (when (eql (ps-peek state) #\.)
         (setf floating-point-p t)
         (advance)
@@ -121,13 +126,13 @@ coefficient out of one number token."
       (when exponent-negative-p (setf exponent (- exponent)))
       (let ((scale (- exponent fractional-digits)))
         (values start (ps-pos state) floating-point-p negative-p
-                coefficient-zero-p scale
+                coefficient-zero-p coefficient scale
                 (or coefficient-zero-p
                     (and (not exponent-overflow-p)
                          (<= (abs scale) (ps-max-exact-exponent state)))))))))
 
 (defun decode-float-range
-    (state text start end negative-p coefficient-zero-p scale scale-valid-p)
+    (state text start end negative-p coefficient-zero-p coefficient scale scale-valid-p)
   "Decode TEXT[start,end) to a correctly rounded double, retaining exact extremes."
   (unless scale-valid-p
     (parse-error-here state "number scale within MAX-EXACT-EXPONENT"))
@@ -154,8 +159,7 @@ coefficient out of one number token."
                      (round-quotient-even numerator (ash denominator (- shift)))
                      (round-quotient-even (ash numerator shift) denominator))))
         (handler-case
-            (let* ((coefficient (scan-coefficient-digits text start end negative-p))
-                   (power (expt 10 (abs scale)))
+            (let* ((power (expt 10 (abs scale)))
                    (numerator (if (minusp scale) coefficient (* coefficient power)))
                    (denominator (if (minusp scale) power 1))
                    (binary-exponent (floor-log2-ratio numerator denominator))
@@ -190,11 +194,10 @@ directly and return its exact value, accumulating a FIXNUM until it would
 overflow and only then widening to a bignum, so the overwhelmingly common
 integer case never allocates a token string.
 
-Returns NIL, leaving the cursor untouched, for anything that is not a
-well-formed plain integer within MAX-NUMBER-LENGTH -- a leading '-' with no
-digit, a value that continues into a '.'/'e'/'E' float, or an over-long token --
-so SCAN-NUMBER remains the single source of grammar validation and diagnostics
-for those cases."
+Returns NIL, leaving the cursor untouched, for malformed or over-long input so
+SCAN-NUMBER remains the source of grammar validation and diagnostics. For a
+token continuing into a float, returns NIL plus continuation metadata while
+leaving the cursor at the decimal point or exponent marker."
   (let* ((text (ps-text state))
          (length (ps-length state))
          (start (ps-pos state))
@@ -213,20 +216,15 @@ for those cases."
     (flet ((fall-back ()
              (setf (ps-pos state) start)
              (return-from scan-integer-fast nil)))
-      ;; Optional leading minus.
       (when (and (< position length) (char= (schar text position) #\-))
         (setf negative-p t)
         (incf position))
-      ;; At least one digit is required; hand malformed input to SCAN-NUMBER.
       (unless (and (< position length) (char<= #\0 (schar text position) #\9))
         (fall-back))
       (cond
-        ;; A leading zero stands alone (RFC 8259 forbids "01"); consume only it.
         ((char= (schar text position) #\0)
          (when (>= position limit) (fall-back))
          (incf position))
-        ;; Otherwise accumulate the [1-9][0-9]* run, switching to a bignum once
-        ;; the running FIXNUM can no longer take another digit.
         (t
          (loop while (< position length)
                for code fixnum = (char-code (schar text position))
@@ -251,26 +249,45 @@ for those cases."
                         (return)))
                   (incf position))
          (unless overflow-p (setf value fixnum-value))))
-      ;; A trailing '.', 'e', or 'E' means this token is really a float.
       (when (< position length)
         (let ((next (schar text position)))
           (when (or (char= next #\.) (char= next #\e) (char= next #\E))
-            (fall-back))))
+            (setf (ps-pos state) position)
+            (return-from scan-integer-fast
+              (values nil t start negative-p value (zerop value))))))
       (setf (ps-pos state) position)
       (if negative-p (- value) value))))
 
 (defun parse-number (state)
   "Parse a JSON number, allocating a raw token only for NUMBER-DECODER."
-  (or (and (not (ps-number-decoder state)) (scan-integer-fast state))
+  (if (ps-number-decoder state)
       (multiple-value-bind
-            (start end floating-point-p negative-p coefficient-zero-p scale scale-valid-p)
+            (start end floating-point-p negative-p coefficient-zero-p coefficient scale scale-valid-p)
           (scan-number state)
-        (let ((text (ps-text state)))
-          (if (ps-number-decoder state)
-              (let ((token (subseq text start end)))
-                (with-json-callback (value state "NUMBER-DECODER"
-                                           (ps-number-decoder state) token
-                                           (not floating-point-p))
-                  value))
-              (decode-float-range state text start end negative-p
-                                  coefficient-zero-p scale scale-valid-p))))))
+        (declare (ignore negative-p coefficient-zero-p coefficient scale scale-valid-p))
+        (let ((token (subseq (ps-text state) start end)))
+          (with-json-callback (value state "NUMBER-DECODER"
+                                     (ps-number-decoder state) token
+                                     (not floating-point-p))
+            value)))
+      (multiple-value-bind
+            (integer-value float-continuation-p start negative-p coefficient coefficient-zero-p)
+          (scan-integer-fast state)
+        (cond
+          (integer-value integer-value)
+          (float-continuation-p
+           (multiple-value-bind
+                 (range-start end floating-point-p range-negative-p range-zero-p
+                              range-coefficient scale scale-valid-p)
+               (scan-number state start negative-p coefficient coefficient-zero-p)
+             (declare (ignore floating-point-p))
+             (decode-float-range state (ps-text state) range-start end range-negative-p
+                                 range-zero-p range-coefficient scale scale-valid-p)))
+          (t
+           (multiple-value-bind
+                 (range-start end floating-point-p range-negative-p range-zero-p
+                              range-coefficient scale scale-valid-p)
+               (scan-number state)
+             (declare (ignore floating-point-p))
+             (decode-float-range state (ps-text state) range-start end range-negative-p
+                                 range-zero-p range-coefficient scale scale-valid-p)))))))
