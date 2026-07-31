@@ -48,14 +48,21 @@
     let
       lib = nixpkgs.lib;
 
-      # Only what is verified: x86_64-linux by CI, aarch64-darwin by the
-      # maintainer's local `nix flake check`. aarch64-linux and x86_64-darwin
-      # are not declared because nothing runs them, and a platform no runner
-      # can build makes `nix flake check --all-systems` fail with "platform
-      # mismatch" rather than skip it. See ADR-0078.
+      # Only what is verified: x86_64-linux, which is what CI builds and tests.
+      # aarch64-darwin was dropped on 2026-08-01 -- its only gate was the
+      # maintainer remembering to run `nix flake check` locally, and a gate
+      # nobody can observe being skipped is not a gate. Nothing else was ever
+      # declared either, and a platform no runner can build makes
+      # `nix flake check --all-systems` fail with "platform mismatch" rather
+      # than skip it. See ADR-0078.
+      #
+      # Consequence, accepted deliberately: mkPackageFlake generates EVERY
+      # per-system output from this one list -- packages, checks, apps and
+      # devShells alike -- so `nix develop` and `nix build` no longer work on
+      # macOS. Development happens on Linux. See PACKAGE_STANDARD.md,
+      # section "systems".
       systems = [
         "x86_64-linux"
-        "aarch64-darwin"
       ];
     in
     # `mkPackageFlake` spans systems -- it obtains a `pkgs` and its own

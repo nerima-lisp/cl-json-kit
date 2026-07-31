@@ -1,14 +1,22 @@
 ;;;; cl-json-kit.asd
+
+;;; This form comes FIRST, before any defsystem. ASDF binds *package* to
+;;; ASDF-USER only for a file it loads itself; read any other way -- a REPL
+;;; `load`, an editor evaluating the buffer, flake.nix parsing :version -- the
+;;; file is read in whatever package happens to be current. Saying it makes
+;;; the file self-contained.
+(in-package #:asdf-user)
+
 (asdf:defsystem "cl-json-kit"
   :description "Dependency-free JSON reader and writer for Common Lisp strings and character streams"
   :long-description "A JSON parser/serializer inspired by JavaScript's JSON.parse/JSON.stringify
 and Python's json module.  Object/array shape is decided explicitly at parse time (never guessed
 from the shape of a cons list afterwards), UTF-16 surrogate pairs in \\uXXXX escapes are decoded
 correctly, and parsing can be bounded with a timeout."
-  :version "1.0.1"
   :author "takeokunn <bararararatty@gmail.com>"
   :maintainer "takeokunn <bararararatty@gmail.com>"
   :license "MIT"
+  :version "1.0.1"
   :homepage "https://github.com/nerima-lisp/cl-json-kit"
   :bug-tracker "https://github.com/nerima-lisp/cl-json-kit/issues"
   :source-control (:git "https://github.com/nerima-lisp/cl-json-kit.git")
@@ -35,10 +43,10 @@ correctly, and parsing can be bounded with a timeout."
 
 (asdf:defsystem "cl-json-kit/test"
   :description "Test system for cl-json-kit"
-  :version "1.0.1"
   :author "takeokunn <bararararatty@gmail.com>"
   :maintainer "takeokunn <bararararatty@gmail.com>"
   :license "MIT"
+  :version "1.0.1"
   :homepage "https://github.com/nerima-lisp/cl-json-kit"
   :bug-tracker "https://github.com/nerima-lisp/cl-json-kit/issues"
   :source-control (:git "https://github.com/nerima-lisp/cl-json-kit.git")

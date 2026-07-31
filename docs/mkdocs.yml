@@ -91,7 +91,9 @@ markdown_extensions:
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  # pymdownx.snippets is deliberately absent: its only use here was pulling the
+  # root CHANGELOG.md into docs/src/changelog.md, and neither file exists any
+  # more (2026-08-01 -- the GitHub Release description is the only changelog).
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -137,5 +139,4 @@ nav:
       - Compatibility Promise: compatibility.md
   - Benchmarks: benchmarks.md
   - Project:
-      - Changelog: changelog.md
       - Contributing: contributing.md

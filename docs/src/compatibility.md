@@ -69,7 +69,9 @@ Within the 1.x line:
 - new options and new exported symbols may be added in a minor release — code
   that does not name them is unaffected;
 - anything intended for eventual removal is first documented as deprecated here
-  and in the [changelog](changelog.md), and keeps working for the rest of 1.x.
+  and in the
+  [release notes](https://github.com/nerima-lisp/cl-json-kit/releases), and
+  keeps working for the rest of 1.x.
 
 ## Reporting a break
 
