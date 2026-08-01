@@ -27,7 +27,7 @@
     };
 
     cl-weave = {
-      url = "github:nerima-lisp/cl-weave/v1.0.0";
+      url = "github:nerima-lisp/cl-weave/v1.1.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -103,22 +103,16 @@
       # what replaces the hand-rolled `"${cl-weave}//:${self}//"` this file
       # used to thread through the check, the app and the devShell separately.
       #
-      # cl-weave is built here rather than taken as `cl-weave.packages.*`
-      # because v1.0.0 predates its own migration: its `packages.default` is
-      # the delivered CLI binary, not an ASDF system. Do NOT reach for
-      # `fromDerivation` on the flake input instead -- that puts cl-weave's
-      # uncompiled SOURCE on the registry, and ASDF then tries to write its
-      # fasls next to those sources, inside the read-only Nix store. Once
-      # cl-weave is migrated and tagged v2.0.0, this whole block collapses to
-      #   lispCheckDependencies = ctx: [ cl-weave.packages.${ctx.system}.cl-weave ];
-      lispCheckDependencies = ctx: [
-        (ctx.cl.lispDerivation {
-          pname = "cl-weave";
-          version = ctx.cl.fromAsdSystem "${cl-weave}/cl-weave.asd";
-          src = cl-weave;
-          lispSystem = "cl-weave";
-        })
-      ];
+      # `packages.*.cl-weave` is cl-weave's ASDF SYSTEM, built by cl-weave's
+      # own flake -- a different output from its `packages.*.default`, which is
+      # the delivered CLI. Taking the system means the consumer never compiles
+      # cl-weave itself.
+      #
+      # Do NOT reach for `fromDerivation` on the flake input instead, here or
+      # for the next sibling dependency added to this list: that puts
+      # cl-weave's uncompiled SOURCE on the registry, and ASDF then tries to
+      # write its fasls next to those sources, inside the read-only Nix store.
+      lispCheckDependencies = ctx: [ cl-weave.packages.${ctx.system}.cl-weave ];
 
       # Drives BOTH `checks.default` and `apps.test`, from this one number, so
       # the command a contributor runs by hand and the gate CI runs cannot
@@ -160,7 +154,7 @@
       # dev shell from the CHECK-ENABLED derivation, so `lispCheckDependencies`
       # are already on that shell's registry -- which is what makes `nix
       # develop` followed by `sbcl --script run-tests.lisp`, the loop
-      # docs/src/contributing.md documents, work at all. Repeating cl-weave
+      # docs/src/project/development.md documents, work at all. Repeating cl-weave
       # here would be a second source of truth for it.
       devShellPackages = ctx: [
         (ctx.pkgs.sbcl.withPackages (ps: [
