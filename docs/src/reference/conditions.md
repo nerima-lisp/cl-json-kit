@@ -1,4 +1,4 @@
-# Error Handling
+# Conditions
 
 `cl-json-kit` signals **typed conditions** with structured, machine-readable
 slots. Diagnostic context, paths, and snippets are bounded, so an error report
@@ -76,7 +76,7 @@ Common triggers include non-finite floats, ratios without an exact finite
 decimal representation (absent a `:number-encoder`), dotted or circular lists,
 circular aggregates, raw surrogate code points, non-string object keys, and
 exceeding `:max-output-length`, `:max-depth`, or `:max-elements`. See
-[Data Model and Mapping](data-model.md#unsupported-writer-inputs).
+[Data Model and Mapping](../guide/data-model.md#unsupported-writer-inputs).
 
 ## Bounded diagnostics as a security property
 
@@ -89,7 +89,7 @@ expected values), and paths are limited in length and made cycle-safe.
 This means you can log or surface a `json-parse-error` without worrying that a
 crafted input has smuggled control characters, an enormous string, or a cyclic
 structure into your logs. The bound is part of the library's
-[security posture](security.md), not just a cosmetic nicety.
+[security posture](resource-limits.md), not just a cosmetic nicety.
 
 ## Catching both condition types
 

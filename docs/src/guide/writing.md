@@ -82,7 +82,7 @@ output suited to tests, diffs, and caching:
     `:sort-keys t` gives deterministic *member ordering*, not RFC 8785
     canonical JSON and not a cross-implementation byte-for-byte guarantee. The
     writer does not implement RFC 8785 number canonicalization. See
-    [RFC 8259 Scope](rfc-8259.md).
+    [RFC 8259 Scope](../reference/rfc-8259.md).
 
 ## Pretty printing
 
@@ -130,7 +130,7 @@ to match a representation your application already uses.
 
 `:max-depth`, `:max-elements`, and `:max-output-length` bound recursion,
 aggregate size, and emitted length. Their semantics and defaults are on
-[Resource Limits and Security](security.md).
+[Resource Limits and Security](../reference/resource-limits.md).
 
 ```lisp
 (json-kit:stringify "abc" :max-output-length 5)  ; => "\"abc\""

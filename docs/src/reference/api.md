@@ -24,7 +24,7 @@ examples and the full discussion.
 ```
 
 Parse the whole string as exactly one JSON value, rejecting trailing data.
-→ [Reading JSON](reading.md#parse)
+→ [Reading JSON](../guide/reading.md#parse)
 
 ### `parse-prefix`
 
@@ -34,7 +34,7 @@ Parse the whole string as exactly one JSON value, rejecting trailing data.
 ```
 
 Parse the first value at or after `:index` and return it plus the exclusive end
-index. → [Reading JSON](reading.md#parse-prefix)
+index. → [Reading JSON](../guide/reading.md#parse-prefix)
 
 ### `read-json`
 
@@ -44,7 +44,7 @@ index. → [Reading JSON](reading.md#parse-prefix)
 ```
 
 Read exactly one JSON value from a character stream, leaving the following
-character unread. → [Reading JSON](reading.md#read-json)
+character unread. → [Reading JSON](../guide/reading.md#read-json)
 
 ## Writing
 
@@ -57,7 +57,7 @@ character unread. → [Reading JSON](reading.md#read-json)
   => string
 ```
 
-Serialize a value to a JSON string. → [Writing JSON](writing.md#stringify)
+Serialize a value to a JSON string. → [Writing JSON](../guide/writing.md#stringify)
 
 ### `write-json`
 
@@ -70,7 +70,7 @@ Serialize a value to a JSON string. → [Writing JSON](writing.md#stringify)
 ```
 
 Write a value to an existing character stream and return the original value.
-→ [Writing JSON](writing.md#write-json)
+→ [Writing JSON](../guide/writing.md#write-json)
 
 ## Sentinels
 
@@ -86,7 +86,7 @@ their identity is what matters, so test them with the predicates rather than
 depending on their value, printed form, or type.
 
 Test these values with the predicates; do not depend on their printed form or
-implementation type. → [Data Model and Mapping](data-model.md#opaque-null-and-false)
+implementation type. → [Data Model and Mapping](../guide/data-model.md#opaque-null-and-false)
 
 ## Parse diagnostics
 
@@ -101,7 +101,7 @@ implementation type. → [Data Model and Mapping](data-model.md#opaque-null-and-
 | `json-parse-error-context` | reader | The `:context` label. |
 | `json-parse-error-text` | function | Bounded, sanitized snippet of the input. |
 
-→ [Error Handling](error-handling.md#parse-errors)
+→ [Error Handling](conditions.md#parse-errors)
 
 ## Serialization diagnostics
 
@@ -111,7 +111,7 @@ implementation type. → [Data Model and Mapping](data-model.md#opaque-null-and-
 | `json-serialization-error-message` | reader | Bounded failure description. |
 | `json-serialization-error-path` | reader | Path to the offending value. |
 
-→ [Error Handling](error-handling.md#serialization-errors)
+→ [Error Handling](conditions.md#serialization-errors)
 
 ## Ordered-object bridges
 
@@ -123,7 +123,7 @@ implementation type. → [Data Model and Mapping](data-model.md#opaque-null-and-
 | `alist->json-object` | function | Validate an alist and convert it to an object. |
 | `json-object->alist` | function | Convert an object, hash table, or alist to an alist. |
 
-→ [Conversion Helpers](conversion.md)
+→ [Conversion Helpers](../guide/conversion.md)
 
 ## Default option values
 
@@ -151,5 +151,5 @@ For convenience, the defaults enforced by the entry points:
 | `context` | `"json"` | reading |
 | `max-elements` (conversion) | `1000000` | conversion helpers |
 
-See [Resource Limits and Security](security.md) for the semantics of each
+See [Resource Limits and Security](resource-limits.md) for the semantics of each
 bound.

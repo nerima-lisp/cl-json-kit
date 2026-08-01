@@ -26,7 +26,7 @@
     "MAKE-JSON-OBJECT" "JSON-OBJECT-P" "JSON-OBJECT-MEMBERS"
     "ALIST->JSON-OBJECT" "JSON-OBJECT->ALIST")
   "Every symbol the JSON-KIT package exports, as of the 1.0 compatibility
-promise in docs/src/compatibility.md.")
+promise in docs/src/reference/compatibility.md.")
 
 (defun external-symbol-names ()
   (let ((names '()))

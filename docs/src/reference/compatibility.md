@@ -18,7 +18,7 @@ Everything the `json-kit` package exports, and the documented behavior of each:
   `alist->json-object`, `json-object->alist`);
 - **the keyword option names and their default values** on every entry point;
 - **the Lisp/JSON mapping** described in
-  [Data Model and Mapping](data-model.md), including which Lisp type each JSON
+  [Data Model and Mapping](../guide/data-model.md), including which Lisp type each JSON
   type parses to and which JSON type each Lisp type serializes to;
 - **the condition type signalled for each class of failure**: malformed input
   and invalid option values signal `json-parse-error`, unserializable values and

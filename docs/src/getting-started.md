@@ -1,8 +1,65 @@
-# Quick Start
+# Getting Started
 
-This page walks through the most common tasks. For the complete option lists,
-see [Reading JSON](reading.md), [Writing JSON](writing.md), and the
-[API Reference](api-reference.md).
+`cl-json-kit` has **no external Common Lisp runtime dependencies**. Only the
+test system additionally uses [`cl-weave`](https://github.com/nerima-lisp/cl-weave).
+
+## With Nix
+
+The repository is a Nix flake. To build the ASDF system:
+
+```sh
+nix build github:nerima-lisp/cl-json-kit
+```
+
+The flake also exposes per-system attributes:
+
+```sh
+# Build the library for the current system.
+nix build .#cl-json-kit
+
+# Run the test suite as a reproducible derivation.
+nix flake check
+
+# Enter a devShell with SBCL and the competitor JSON libraries
+# used by the benchmark harness.
+nix develop
+
+# Build this documentation site (Material for MkDocs, fully offline).
+nix build .#docs
+```
+
+The `devShells.<system>.default` shell preloads Jzon, Jonathan, JSOWN, and
+Yason so `benchmark/competitors.lisp` can compare against them. See
+[Benchmarks](reference/benchmarks.md).
+
+## With ASDF
+
+Put the repository where ASDF can find it — for example under
+`~/common-lisp/` or a directory on your `CL_SOURCE_REGISTRY` — then load it:
+
+```lisp
+(asdf:load-system "cl-json-kit")
+```
+
+Everything a caller needs is exported from the single `json-kit` package.
+Every example on this site references symbols with the `json-kit:` prefix.
+
+## Supported runtime
+
+`cl-json-kit` targets **SBCL** first and is written in portable Common Lisp
+elsewhere. The only implementation-specific behavior is the optional
+`:timeout-seconds` wall-clock safeguard, which uses `sb-ext:with-timeout` on
+SBCL and is a portable no-op on other implementations — the explicit size and
+depth [limits](reference/resource-limits.md) remain the safeguards there.
+
+## Verifying the install
+
+A quick REPL round-trip confirms the system is loaded:
+
+```lisp
+(json-kit:stringify (json-kit:parse "[1,2,3]"))
+;; => "[1,2,3]"
+```
 
 ## Parse a document
 
@@ -99,16 +156,18 @@ a path into the document:
           :expected (json-kit:json-parse-error-expected condition))))
 ```
 
-See [Error Handling](error-handling.md) for every reader on the condition
+See [Conditions](reference/conditions.md) for every reader on the condition
 objects.
 
 ## Next steps
 
-- [Data Model and Mapping](data-model.md) — exactly how each JSON and Lisp
-  value is represented.
-- [Reading JSON](reading.md) — every `parse` option, callbacks, and duplicate
-  key policies.
-- [Writing JSON](writing.md) — pretty printing, sorting, and number encoding.
-- [Resource Limits and Security](security.md) — bounding untrusted input.
-- [FAQ](faq.md) — thread safety, BOM handling, and other questions that come
-  up past the basics.
+- [Data Model and Mapping](guide/data-model.md) — exactly how each JSON and
+  Lisp value is represented.
+- [Reading JSON](guide/reading.md) — every `parse` option, callbacks, and
+  duplicate key policies.
+- [Writing JSON](guide/writing.md) — pretty printing, sorting, and number
+  encoding.
+- [Resource Limits and Security](reference/resource-limits.md) — bounding
+  untrusted input.
+- [Troubleshooting](guide/troubleshooting.md) — thread safety, BOM handling,
+  and other questions that come up past the basics.

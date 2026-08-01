@@ -15,7 +15,7 @@
 ;;;; bytes, overlong sequences, UTF-16 with and without a BOM, ISO-8859-1).  This
 ;;;; library's API consumes Common Lisp characters, not octets, so those cases
 ;;;; exercise the external-format layer rather than the parser -- see
-;;;; docs/src/rfc-8259.md, "Characters, not octets".  They are:
+;;;; docs/src/reference/rfc-8259.md, "Characters, not octets".  They are:
 ;;;;   i_string_UTF-16LE_with_BOM
 ;;;;   i_string_UTF-8_invalid_sequence
 ;;;;   i_string_UTF8_surrogate_U+D800
@@ -374,7 +374,7 @@ comparison so a failure report identifies which corpus file broke."
     ("i_structure_UTF-8_BOM_empty_object" (#xFEFF "{}") :reject)
     )
   "Corpus cases (i_) RFC 8259 leaves to the implementation, each paired with this
-library's deliberate choice.  See docs/src/rfc-8259.md for the rationale.")
+library's deliberate choice.  See docs/src/reference/rfc-8259.md for the rationale.")
 
 (describe "RFC 8259 conformance (nst/JSONTestSuite)"
   (it "accepts every case the corpus requires a conforming parser to accept"

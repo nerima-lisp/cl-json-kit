@@ -81,7 +81,7 @@ The library's error reports are themselves bounded: attacker-influenced
 strings, paths, and expected-value descriptions are truncated and escaped
 before they reach a condition slot, so logging an error cannot echo an
 unbounded or control-character-laden payload. See
-[Error Handling](error-handling.md#bounded-diagnostics-as-a-security-property).
+[Error Handling](conditions.md#bounded-diagnostics-as-a-security-property).
 
 ## Thread safety
 
@@ -94,7 +94,7 @@ Independent calls on independent data from different threads need no external
 locking. You are still responsible for your own synchronization if multiple
 threads write to the *same* stream, or read/mutate the *same* hash table or
 `json-object`, concurrently. See the
-[FAQ](faq.md#is-cl-json-kit-thread-safe) for more detail.
+[FAQ](../guide/troubleshooting.md#is-cl-json-kit-thread-safe) for more detail.
 
 ## What the limits do not cover
 

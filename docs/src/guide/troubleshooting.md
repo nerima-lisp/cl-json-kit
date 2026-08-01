@@ -1,6 +1,6 @@
-# FAQ
+# Troubleshooting
 
-Answers to questions that come up once you go past the basic examples. For the
+Symptoms and answers that come up once you go past the basic examples. For the
 option-by-option reference, see [Reading JSON](reading.md) and
 [Writing JSON](writing.md).
 
@@ -49,17 +49,17 @@ consecutive values on a stream (see [Reading JSON](reading.md#read-json)) lets
 you process a large newline-delimited file one value at a time without holding
 every value at once, but each individual value is still fully materialized.
 Use [`max-depth`, `max-array-elements`, `max-object-members`, and
-`max-input-length`](security.md) to bound how large any single value can
+`max-input-length`](../reference/resource-limits.md) to bound how large any single value can
 grow.
 
 ## How does this compare to Jzon, Jonathan, JSOWN, or Yason?
 
-[Benchmarks](benchmarks.md) covers throughput, measured with the same
+[Benchmarks](../reference/benchmarks.md) covers throughput, measured with the same
 correctness-gated harness against all four. The API-level difference that
 motivates this library, independent of speed, is explicit shape control: JSON
 object/array shape is always chosen by you (`:object-type` / `:array-type`),
 never inferred from whether a Lisp list of conses happens to look like an
-alist. See [Why another JSON library?](README.md#why-another-json-library)
+alist. See [Why another JSON library?](../index.md#why-another-json-library)
 and [Data Model and Mapping](data-model.md) for the full rationale. This page
 does not attempt a feature-by-feature matrix against the other libraries —
 consult their own documentation for what they support.
@@ -67,7 +67,7 @@ consult their own documentation for what they support.
 ## Will `(use-package :json-kit)` clash with `common-lisp` or another JSON library?
 
 None of `json-kit`'s exported symbols (`parse`, `stringify`, `write-json`,
-etc. — see the [API Reference](api-reference.md)) shadow a standard
+etc. — see the [API Reference](../reference/api.md)) shadow a standard
 `common-lisp` symbol, so `(use-package :json-kit)` is safe to add to a fresh
 package. If you also use-package another JSON library in the same package,
 check for a clash between the two libraries' own exports — `parse` and

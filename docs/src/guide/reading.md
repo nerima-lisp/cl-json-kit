@@ -173,14 +173,14 @@ Every other keyword matches `parse`.
 !!! note "Configure the external format yourself"
     `read-json` operates on characters. For UTF-8 files or sockets, set the
     stream's external format before calling it. There is no octet/UTF-8 API.
-    See [RFC 8259 Scope](rfc-8259.md).
+    See [RFC 8259 Scope](../reference/rfc-8259.md).
 
 ## Resource limits
 
 Every limit keyword (`:max-depth`, `:max-input-length`, `:max-string-length`,
 `:max-number-length`, `:max-exact-exponent`, `:max-array-elements`,
 `:max-object-members`, and the SBCL-only `:timeout-seconds`) is documented in
-detail on [Resource Limits and Security](security.md). The defaults are finite
+detail on [Resource Limits and Security](../reference/resource-limits.md). The defaults are finite
 and deliberately conservative; tune them to your trust boundary.
 
 ## The `context` label

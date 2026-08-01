@@ -1,7 +1,10 @@
-# Contributing
+# Development
 
-Contributions are welcome. This page covers the development workflow, how to run
-the tests and benchmarks, and the conventions the codebase follows.
+The build, test, benchmark, and documentation commands for working on
+`cl-json-kit` itself, plus the conventions the codebase follows.
+
+For how to file an issue or open a pull request, see the org-wide
+[CONTRIBUTING.md](https://github.com/nerima-lisp/.github/blob/main/CONTRIBUTING.md).
 
 ## Development environment
 
@@ -12,9 +15,9 @@ nix develop
 ```
 
 This drops you into a shell with SBCL and the competitor JSON libraries
-(Jzon, Jonathan, JSOWN, Yason) that the [benchmarks](benchmarks.md) compare
-against. If you use [direnv](https://direnv.net/), `direnv allow` loads it
-automatically.
+(Jzon, Jonathan, JSOWN, Yason) that the [benchmarks](../reference/benchmarks.md)
+compare against. If you use [direnv](https://direnv.net/), `direnv allow` loads
+it automatically.
 
 If you prefer a local SBCL, ensure `cl-json-kit` (and, for the tests,
 `cl-weave`) are visible to ASDF, then load the system:
@@ -46,7 +49,8 @@ feature, and are worth knowing about before changing them:
 - **`t/public-api-test.lisp`** pins the exact set of symbols the `json-kit`
   package exports and requires a docstring on each. Adding or removing an export
   fails this spec by design — update the list in the same commit, and classify
-  the change against the [Compatibility Promise](compatibility.md).
+  the change against the
+  [Compatibility Promise](../reference/compatibility.md).
 - **`t/rfc8259-conformance-test.lisp`** vendors the parsing corpus of
   [JSONTestSuite](https://github.com/nst/JSONTestSuite) (MIT) as data. It is
   vendored rather than fetched so conformance is checked offline inside the Nix
@@ -59,7 +63,8 @@ feature, and are worth knowing about before changing them:
 
 ## Running the benchmarks
 
-See [Benchmarks](benchmarks.md) for the full harness documentation. In short:
+See [Benchmarks](../reference/benchmarks.md) for the full harness
+documentation. In short:
 
 ```sh
 # The library's own reader/writer throughput.
@@ -86,16 +91,16 @@ by [`cl-json-kit.asd`](https://github.com/nerima-lisp/cl-json-kit/blob/main/cl-j
 
 The single public package `json-kit` is defined in `src/package.lisp`; only the
 symbols listed there are part of the supported API. See the
-[API Reference](api-reference.md).
+[API](../reference/api.md).
 
 ## Conventions
 
 - **Explicit shape, always.** The library never infers JSON object/array shape
   from the structure of a Lisp value. Any new feature must preserve this
-  invariant — see [Data Model and Mapping](data-model.md).
+  invariant — see [Data Model and Mapping](../guide/data-model.md).
 - **Bound untrusted input.** New reader or writer paths that can grow with input
   size must be governed by a limit. See
-  [Resource Limits and Security](security.md).
+  [Resource Limits and Security](../reference/resource-limits.md).
 - **Bounded diagnostics.** Attacker-influenced strings, paths, and expected
   values in conditions are truncated and escaped at construction. Keep it that
   way.
@@ -139,10 +144,9 @@ in sync with the files under `docs/src/`. Pushing a documentation change to
 [`Publish documentation`](https://github.com/nerima-lisp/cl-json-kit/blob/main/.github/workflows/docs.yml)
 workflow.
 
-## Reporting issues
+## Reporting a parse or serialization bug
 
-Use the [issue tracker](https://github.com/nerima-lisp/cl-json-kit/issues) for
-bugs and questions. For a parse or serialization bug, include the exact input,
-the options passed, the expected result, and what you observed — the
-[error path and coordinates](error-handling.md) from the signalled condition
-are especially helpful.
+Use the [issue tracker](https://github.com/nerima-lisp/cl-json-kit/issues).
+Include the exact input, the options passed, the expected result, and what you
+observed — the [error path and coordinates](../reference/conditions.md) from
+the signalled condition are especially helpful.

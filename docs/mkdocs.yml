@@ -21,6 +21,12 @@ docs_dir: src
 site_dir: ../site
 use_directory_urls: true
 
+# Also passed as --strict by the flake's docs build. Declaring it here as well
+# means `mkdocs serve` applies the same gate, so no invocation path silently
+# tolerates a broken link or a page missing from the nav. Use
+# `mkdocs serve --no-strict` while drafting.
+strict: true
+
 copyright: Copyright &copy; cl-json-kit contributors — MIT License
 
 theme:
@@ -119,24 +125,39 @@ markdown_extensions:
       permalink: true
       title: On this page
 
+# Five fixed sections in this order, per DOCS_STANDARD.md: Home, Getting
+# Started, Guide, Reference, Project. They track the reader's state — not yet
+# running, running but new to the design, looking one answer up, contributing
+# — and readership drops at each step, so reference sits at the back.
+#
+# The section names match the directories under docs/src/, so the nav and the
+# tree give the same answer to "where does this page live". index.md and
+# getting-started.md stay at the root rather than under guide/: a reader who
+# has not run anything yet should not have to open the Guide first.
+#
+# Every page under docs/src/ must appear here — `strict: true` fails the build
+# on an unlisted page, which is what keeps this list from falling behind.
 nav:
-  - Home: README.md
-  - Getting Started:
-      - Installation: installation.md
-      - Quick Start: quick-start.md
+  - Home: index.md
+  - Getting Started: getting-started.md
   - Guide:
-      - Data Model and Mapping: data-model.md
-      - Reading JSON: reading.md
-      - Writing JSON: writing.md
-      - Conversion Helpers: conversion.md
-      - Error Handling: error-handling.md
-      - Resource Limits and Security: security.md
-      - Recipes: recipes.md
-      - FAQ: faq.md
+      - Data Model and Mapping: guide/data-model.md
+      - Reading JSON: guide/reading.md
+      - Writing JSON: guide/writing.md
+      - Conversion Helpers: guide/conversion.md
+      - Recipes: guide/recipes.md
+      - Troubleshooting: guide/troubleshooting.md
   - Reference:
-      - API Reference: api-reference.md
-      - RFC 8259 Scope: rfc-8259.md
-      - Compatibility Promise: compatibility.md
-  - Benchmarks: benchmarks.md
+      - API: reference/api.md
+      - Conditions: reference/conditions.md
+      - Resource Limits and Security: reference/resource-limits.md
+      - RFC 8259 Scope: reference/rfc-8259.md
+      - Compatibility Promise: reference/compatibility.md
+      - Benchmarks: reference/benchmarks.md
   - Project:
-      - Contributing: contributing.md
+      - Development: project/development.md
+
+# docs/notes/ holds measurements worth keeping but not worth publishing.
+# Without this declaration --strict fails the build the moment one is added.
+not_in_nav: |
+  notes/

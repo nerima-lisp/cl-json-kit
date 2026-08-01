@@ -98,7 +98,7 @@ libraries.
 
 Negative floating-point zero is preserved by the writer. RFC 8785 canonical
 number formatting is **not** implemented; see
-[RFC 8259 Scope](rfc-8259.md).
+[RFC 8259 Scope](../reference/rfc-8259.md).
 
 ## Unsupported writer inputs
 
@@ -112,7 +112,7 @@ The following signal `json-serialization-error` when written:
 - non-string object keys;
 - any other unsupported Lisp value.
 
-See [Error Handling](error-handling.md) for the condition's slots.
+See [Error Handling](../reference/conditions.md) for the condition's slots.
 
 ## Characters, not octets
 
@@ -120,4 +120,4 @@ The entire API operates on Common Lisp **characters**, not octets. Encoding
 validity and UTF-8 decoding belong to the stream / external-format layer: for
 UTF-8 files or sockets, configure the stream's external format yourself before
 calling `read-json` or `write-json`. There is no octet/UTF-8 API. See
-[RFC 8259 Scope](rfc-8259.md) for the full boundary.
+[RFC 8259 Scope](../reference/rfc-8259.md) for the full boundary.

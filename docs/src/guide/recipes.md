@@ -182,13 +182,13 @@ The defaults are generic; tighten them for a public endpoint:
                 :timeout-seconds 2)   ; wall-clock guard on SBCL
 ```
 
-See [Resource Limits and Security](security.md) for each bound.
+See [Resource Limits and Security](../reference/resource-limits.md) for each bound.
 
 ## Strip a UTF-8 BOM before parsing
 
 The reader treats a leading `U+FEFF` byte-order mark as an unexpected
 character, not whitespace — it is not part of the JSON grammar (see
-[RFC 8259 Scope](rfc-8259.md#what-the-reader-rejects)). Files written by some
+[RFC 8259 Scope](../reference/rfc-8259.md#what-the-reader-rejects)). Files written by some
 editors and spreadsheet exporters include one, so strip it before parsing text
 read from an untrusted file:
 
@@ -222,4 +222,4 @@ Turn a signalled condition into a structured, user-facing diagnostic:
             (json-kit:json-parse-error-expected c))))
 ```
 
-See [Error Handling](error-handling.md) for every accessor.
+See [Error Handling](../reference/conditions.md) for every accessor.
