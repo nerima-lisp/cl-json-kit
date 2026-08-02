@@ -24,7 +24,7 @@ or put the repository where ASDF can find it:
 
 The library itself has no external dependencies; only the test system uses
 `cl-weave`. SBCL is the supported implementation — see
-[Installation](https://nerima-lisp.github.io/cl-json-kit/installation/).
+[Getting Started](https://nerima-lisp.github.io/cl-json-kit/getting-started/).
 
 ## Use
 
@@ -50,8 +50,8 @@ The library itself has no external dependencies; only the test system uses
 
 `parse-prefix` returns one value plus its end index, for scanning concatenated
 values; `read-json` reads exactly one value from a character stream without
-over-consuming. See [Reading](https://nerima-lisp.github.io/cl-json-kit/reading/)
-and [Writing](https://nerima-lisp.github.io/cl-json-kit/writing/) for every
+over-consuming. See [Reading](https://nerima-lisp.github.io/cl-json-kit/guide/reading/)
+and [Writing](https://nerima-lisp.github.io/cl-json-kit/guide/writing/) for every
 option.
 
 ## Why another JSON library?
@@ -76,7 +76,7 @@ as an object.
 
 Note that `nil` is the empty list and is written as `[]`, never as `null` or
 `false`. Full rules, including ratios and rejected values, are in the
-[Data Model](https://nerima-lisp.github.io/cl-json-kit/data-model/).
+[Data Model](https://nerima-lisp.github.io/cl-json-kit/guide/data-model/).
 
 ## What you also get
 
@@ -85,17 +85,17 @@ Note that `nil` is the empty list and is written as `[]`, never as `null` or
   test suite and runs on every build: 95/95 must-accept cases accepted, 188/188
   must-reject cases rejected, nothing crashing or signalling anything but
   `json-parse-error`, and every implementation-defined answer pinned by a test.
-  ([details](https://nerima-lisp.github.io/cl-json-kit/rfc-8259/))
+  ([details](https://nerima-lisp.github.io/cl-json-kit/reference/rfc-8259/))
 - **A stable API.** From 1.0.0 on, the exported surface and its documented
   behavior follow [Semantic Versioning](https://semver.org/), and the export
   list is asserted by the test suite so it cannot change by accident.
-  ([what is and is not covered](https://nerima-lisp.github.io/cl-json-kit/compatibility/))
+  ([what is and is not covered](https://nerima-lisp.github.io/cl-json-kit/reference/compatibility/))
 - **Bounded by default.** Every entry point enforces finite input, output,
   depth, and element limits, plus an optional wall-clock timeout on SBCL.
-  ([limits](https://nerima-lisp.github.io/cl-json-kit/security/))
+  ([limits](https://nerima-lisp.github.io/cl-json-kit/reference/resource-limits/))
 - **Structured diagnostics.** Failures signal typed conditions carrying
   position, line, column, path, and a bounded, sanitized snippet.
-  ([error handling](https://nerima-lisp.github.io/cl-json-kit/error-handling/))
+  ([error handling](https://nerima-lisp.github.io/cl-json-kit/reference/conditions/))
 - **Correct Unicode.** `\uXXXX` escapes decode UTF-16 surrogate pairs into a
   single non-BMP character; lone surrogates are rejected in both directions.
 
@@ -107,7 +107,7 @@ sbcl --script run-tests.lisp   # or: nix flake check
 
 `nix flake check` also runs the formatting gate and builds the documentation.
 Benchmark harnesses live in [`benchmark/`](benchmark/README.md), and
-[Contributing](https://nerima-lisp.github.io/cl-json-kit/contributing/) covers
+[Development](https://nerima-lisp.github.io/cl-json-kit/project/development/) covers
 the source layout and conventions.
 
 ## License
