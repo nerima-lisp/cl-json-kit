@@ -27,7 +27,7 @@
     };
 
     cl-weave = {
-      url = "github:nerima-lisp/cl-weave/v1.1.0";
+      url = "github:nerima-lisp/cl-weave/v1.1.4";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
