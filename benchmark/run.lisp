@@ -1,6 +1,8 @@
 ;;;; Reproducible SBCL benchmark harness for cl-json-kit.
 (require :asdf)
 
+(require :sb-posix)
+
 (let* ((script (or *load-truename* *compile-file-truename*))
        (default-root
       (uiop:pathname-parent-directory-pathname
@@ -352,14 +354,38 @@
           do (unless first (write-char #\Tab))
              (princ (tsv-field field)))
     (terpri))
-  (defun command-output (program arguments)
+  (defun process-wait-with-timeout (process timeout-seconds)
+    "Poll PROCESS until it exits or TIMEOUT-SECONDS elapses, without blocking
+past the deadline the way SB-EXT:PROCESS-WAIT alone would (it has no timeout
+parameter at all -- confirmed empirically, not assumed). Returns T if the
+process exited in time, NIL if the deadline was hit."
+    (let ((deadline (+ (get-internal-real-time)
+                        (* timeout-seconds internal-time-units-per-second))))
+      (loop
+        (unless (sb-ext:process-alive-p process) (return t))
+        (when (> (get-internal-real-time) deadline) (return nil))
+        (sleep 0.05))))
+
+  (defun command-output (program arguments &key (timeout-seconds 5))
+    "Run PROGRAM with ARGUMENTS and return its trimmed stdout, or \"unknown\" on
+any failure or timeout. A process that outlives TIMEOUT-SECONDS is escalated
+SIGTERM then SIGKILL against its whole process group, so a hung child (or one
+that forks its own children) cannot stall this script indefinitely."
     (handler-case
-        (string-trim
-         (list #\Space #\Tab #\Newline #\Return)
-         (uiop:run-program (cons program arguments)
-                           :output :string
-                           :error-output nil
-                           :ignore-error-status t))
+        (let ((process (sb-ext:run-program program arguments
+                                            :output :stream
+                                            :error :output
+                                            :search t
+                                            :wait nil)))
+          (unless (process-wait-with-timeout process timeout-seconds)
+            (sb-ext:process-kill process sb-posix:sigterm :process-group)
+            (unless (process-wait-with-timeout process 2)
+              (sb-ext:process-kill process sb-posix:sigkill :process-group)))
+          (sb-ext:process-wait process)
+          (let ((output (sb-ext:process-output process)))
+            (string-trim
+             (list #\Space #\Tab #\Newline #\Return)
+             (if output (uiop:slurp-stream-string output) ""))))
       (error () "unknown")))
   (defun nonempty-or-unknown (value)
     (if (and (stringp value) (plusp (length value)))
