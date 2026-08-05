@@ -5,7 +5,7 @@
   (:shadowing-import-from #:cl-weave #:describe)
   (:import-from #:cl-weave
    ;; Registration and assertions
-   #:it #:it-each #:it-property #:it-fuzz
+   #:it #:it-each #:it-property #:it-fuzz #:it-sequential
    #:expect #:signals #:run-all
    ;; Custom matcher definition
    #:defmatcher
@@ -13,7 +13,13 @@
    #:gen-integer #:gen-string #:gen-vector #:gen-list
    #:gen-one-of #:gen-recursive #:gen-member #:gen-map #:gen-tuple
    ;; Soft (all-failures-collected) assertions
-   #:with-soft-assertions)
+   #:with-soft-assertions
+   ;; Fixture hooks
+   #:before-each
+   ;; Mocking
+   #:make-mock-function #:mock-calls
+   ;; Mutation testing
+   #:run-mutations #:assert-mutation-score)
   (:export #:run-tests))
 
 (in-package #:cl-json-kit/test)

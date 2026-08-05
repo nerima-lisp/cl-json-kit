@@ -35,7 +35,22 @@
     (let ((cycle (list 0 1 2)))
       (setf (cdddr cycle) cycle)
       (expect (equal (json-kit::bounded-diagnostic-path cycle 32) (list 0 1 2))
-              :to-be-truthy))))
+              :to-be-truthy)))
+
+  (it "renders a character value through SAFE-DIAGNOSTIC-SNIPPET"
+    (expect (string= (json-kit::safe-diagnostic-snippet #\a) "a") :to-be-truthy))
+
+  (it "wraps a non-list BOUNDED-DIAGNOSTIC-PATH argument in a single-element list"
+    (expect (equal (json-kit::bounded-diagnostic-path "not-a-list" 32) (list "not-a-list"))
+            :to-be-truthy))
+
+  (it "falls back to SAFE-DIAGNOSTIC-SNIPPET for an out-of-range integer path component"
+    ;; A negative component fails the direct-collect range check
+    ;; (0 <= component <= MOST-POSITIVE-FIXNUM), so it takes the same escaped-
+    ;; rendering path as a string or symbol component instead of being
+    ;; collected as a raw integer.
+    (expect (equal (json-kit::bounded-diagnostic-path (list -1) 32) (list "-1"))
+            :to-be-truthy)))
 
 (describe "condition slot bounding at construction"
   (it "truncates an oversized JSON-PARSE-ERROR context, expected, and text"

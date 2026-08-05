@@ -6,7 +6,8 @@
     (let ((stream (make-string-output-stream)))
       (write-json "a" stream :max-output-length 3)
       (expect (string= (get-output-stream-string stream) "\"a\"") :to-be-truthy))
-    (signals json-serialization-error (write-json "a" (make-string-output-stream) :max-output-length 2))
+    (signals json-serialization-error
+      (write-json "a" (make-string-output-stream) :max-output-length 2))
     (expect (string= (stringify #() :max-elements 0) "[]") :to-be-truthy)
     (signals json-serialization-error (stringify #(1) :max-elements 0)))
 
@@ -18,6 +19,10 @@
     (signals json-serialization-error (stringify #(#(1)) :max-depth 0))
     (signals json-serialization-error (stringify #(1) :indent -1))
     (signals json-serialization-error (stringify #(1) :indent 1.5)))
+
+  (it "rejects an invalid NUMBER-ENCODER designator"
+    (signals json-serialization-error (stringify 1 :number-encoder (make-symbol "MISSING-ENCODER")))
+    (signals json-serialization-error (stringify 1 :number-encoder 42)))
 
   (it-each ((:max-depth -1) (:max-depth 1.5)
             (:max-elements -1) (:max-elements 1.5)
@@ -68,7 +73,43 @@
                                expected-message)
                       :to-be-truthy)))
           (expect (string= (get-output-stream-string stream) "")
-                  :to-be-truthy))))))
+                  :to-be-truthy)))))
+  (it-sequential "ENSURE-DEPTH's MAX-DEPTH boundary check kills every mutation"
+    ;; ENSURE-DEPTH, *JSON-MAXIMUM-DEPTH*, and SERIALIZATION-ERROR are internal
+    ;; (unexported) JSON-KIT symbols, so every reference here must be package-
+    ;; qualified with JSON-KIT:: -- an unqualified name would silently intern a
+    ;; distinct CL-JSON-KIT/TEST symbol instead of touching the real function,
+    ;; making EVAL redefine a decoy and every mutation vacuously "survive" as
+    ;; untested rather than being genuinely killed or not.
+    ;;
+    ;; This must run sequentially: EVAL re-redefines the one real global
+    ;; ENSURE-DEPTH per mutant, so a concurrent test calling it mid-mutation
+    ;; would see a temporarily wrong definition.
+    (let ((original-form
+            '(defun json-kit::ensure-depth (level)
+              (when (and json-kit::*json-maximum-depth*
+                         (> level json-kit::*json-maximum-depth*))
+                (json-kit::serialization-error "serialization nesting exceeds MAX-DEPTH")))))
+      (unwind-protect
+          (let ((results
+                  (run-mutations
+                   original-form
+                   (lambda (mutant-form mutation)
+                     (declare (ignore mutation))
+                     (eval mutant-form)
+                     (handler-case
+                         (let ((json-kit::*json-maximum-depth* 5))
+                           ;; A correct ENSURE-DEPTH must not signal exactly at
+                           ;; the limit and must signal one past it; either
+                           ;; direction wrong means the mutant is caught here
+                           ;; rather than surviving into ASSERT-MUTATION-SCORE.
+                           (and (progn (json-kit::ensure-depth 5) t)
+                                (handler-case (progn (json-kit::ensure-depth 6) nil)
+                                  (json-serialization-error () t))))
+                       (error () nil))))))
+            (expect (plusp (length results)) :to-be-truthy)
+            (assert-mutation-score results 1.0))
+        (eval original-form)))))
 
 (describe "cycles and shape validation"
   (it "rejects circular aggregates but permits shared acyclic subtrees"
