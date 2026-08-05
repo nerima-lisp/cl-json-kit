@@ -51,15 +51,13 @@ costs one write rather than one per character."
           (declare (type fixnum buffer-size used)
                    (type simple-string buffer))
           (labels ((flush-buffer ()
+                     ;; Reached only when *JSON-MAXIMUM-OUTPUT-LENGTH* is NIL --
+                     ;; the buffered branch's own guard above requires that --
+                     ;; so there is no output budget to check here, unlike
+                     ;; FLUSH-RUN in the run-flushing branch below.
                      (unless (zerop used)
-                       (if (or (null *json-maximum-output-length*)
-                               (<= used (- *json-maximum-output-length*
-                                           *json-output-count*)))
-                           (progn
-                             (reserve-output used)
-                             (write-string buffer *json-output-stream* :end used))
-                           (loop for index fixnum below used
-                                 do (emit-character (schar buffer index))))
+                       (reserve-output used)
+                       (write-string buffer *json-output-stream* :end used)
                        (setf used 0))))
             (loop for index fixnum below size
                   for character = (char string index)
