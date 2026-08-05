@@ -6,7 +6,8 @@
     (let ((table (make-hash-table :test #'equal)))
       (setf (gethash "a" table) 1)
       (expect (string= (stringify table :pretty t) (format nil "{~%  \"a\": 1~%}")) :to-be-truthy))
-    (expect (string= (stringify (list 1 2) :pretty t) (format nil "[~%  1,~%  2~%]")) :to-be-truthy))
+    (expect (string= (stringify (list 1 2) :pretty t) (format nil "[~%  1,~%  2~%]"))
+            :to-be-truthy))
 
   (it "sorts object keys deterministically"
     (let ((table (make-hash-table :test #'equal)))

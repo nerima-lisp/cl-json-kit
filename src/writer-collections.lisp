@@ -19,22 +19,21 @@ circular list and enforcing MAX-ELEMENTS as it counts."
   "Serialize a LIST or VECTOR SEQUENCE as a JSON array."
   (ensure-depth level)
   (let ((count (if (listp sequence)
-                   (proper-list-length sequence)
-                   (length sequence))))
+                    (proper-list-length sequence)
+                    (length sequence))))
     (ensure-element-count count)
-    (with-active-aggregate (sequence)
-      (with-json-brackets (#\[ #\] level count)
-        (labels ((write-element (element index)
-                   (emit-json-member (index level)
-                     (with-json-path (index)
-                       (write-json-value element (1+ level))))))
-          (if (listp sequence)
-              (loop for element in sequence
-                    for index from 0
-                    do (write-element element index))
-              (loop for element across sequence
-                    for index from 0
-                    do (write-element element index))))))))
+    (with-json-aggregate-brackets (sequence #\[ #\] level count)
+      (labels ((write-element (element index)
+                 (emit-json-member (index level)
+                   (with-json-path (index)
+                     (write-json-value element (1+ level))))))
+        (if (listp sequence)
+            (loop for element in sequence
+                  for index from 0
+                  do (write-element element index))
+            (loop for element across sequence
+                  for index from 0
+                  do (write-element element index)))))))
 
 ;;; ---------------------------------------------------------------------
 ;;; Objects from hash tables
@@ -87,18 +86,17 @@ so hash-table and ordered-object serialization agree on one member shape."
   (let ((count (hash-table-count table))
         (pairs (when *json-sort-keys* (validated-object-pairs table))))
     (unless *json-sort-keys* (validate-object-keys table))
-    (with-active-aggregate (table)
-      (with-json-brackets (#\{ #\} level count)
-        (if *json-sort-keys*
-            (loop for (key . value) in pairs
-                  for index from 0
-                  do (emit-object-member key value index level))
-            (let ((index 0))
-              (maphash
-               (lambda (key value)
-                 (emit-object-member key value index level)
-                 (incf index))
-               table)))))))
+    (with-json-aggregate-brackets (table #\{ #\} level count)
+      (if *json-sort-keys*
+          (loop for (key . value) in pairs
+                for index from 0
+                do (emit-object-member key value index level))
+          (let ((index 0))
+            (maphash
+             (lambda (key value)
+               (emit-object-member key value index level)
+               (incf index))
+             table))))))
 
 ;;; ---------------------------------------------------------------------
 ;;; Objects from ordered JSON-OBJECTs
@@ -113,11 +111,10 @@ so hash-table and ordered-object serialization agree on one member shape."
         (serialization-error "JSON object members must be (key . value) conses"))
       (unless (stringp (car pair))
         (serialization-error "JSON object keys must be strings, got ~S" (car pair))))
-    (with-active-aggregate (object)
-      (with-json-brackets (#\{ #\} level count)
-        (loop for (key . value) in members
-              for index from 0
-              do (emit-object-member key value index level))))))
+    (with-json-aggregate-brackets (object #\{ #\} level count)
+      (loop for (key . value) in members
+            for index from 0
+            do (emit-object-member key value index level)))))
 
 ;;; ---------------------------------------------------------------------
 ;;; Type dispatch

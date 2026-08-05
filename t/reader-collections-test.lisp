@@ -34,15 +34,13 @@
                    :object-type :alist
                    :duplicate-key-policy :preserve)
             :to-equal (list (cons "a" 1) (cons "a" 2)))
-    (let ((calls 0))
+    (let ((mock (make-mock-function #'string-downcase)))
       (expect (parse "{\"A\":1,\"a\":2}"
                      :object-type :alist
                      :duplicate-key-policy :preserve
-                     :key-decoder (lambda (key)
-                                    (incf calls)
-                                    (string-downcase key)))
+                     :key-decoder mock)
               :to-equal (list (cons "a" 1) (cons "a" 2)))
-      (expect (= calls 2) :to-be-truthy)))
+      (expect (length (mock-calls mock)) :to-be 2)))
 
   (it "reports the offending key when :ERROR meets a duplicate"
     (let ((condition
@@ -61,16 +59,15 @@
         (expect (= (gethash "a" last) 2) :to-be-truthy))))
 
   (it "stops at the first duplicate before decoding the second value"
-    (let ((calls 0))
+    (let ((mock (make-mock-function (lambda (token integer-p)
+                                       (declare (ignore integer-p))
+                                       (parse-integer token)))))
       (signals json-parse-error
         (parse "{\"a\":1,\"A\":2}"
                :key-decoder #'string-downcase
                :duplicate-key-policy :error
-               :number-decoder (lambda (token integer-p)
-                                 (declare (ignore integer-p))
-                                 (incf calls)
-                                 (parse-integer token))))
-      (expect (= calls 1) :to-be-truthy)))
+               :number-decoder mock))
+      (expect (length (mock-calls mock)) :to-be 1)))
 
   (it "round-trips duplicate members through the explicit representation"
     (let* ((text "{\"a\":1,\"a\":2}")
@@ -116,15 +113,14 @@
     (expect (parse "{\"a\":null,\"a\":1}" :null-value nil
                                           :object-type :alist :duplicate-key-policy :last)
             :to-equal (list (cons "a" 1)))
-    (let ((calls 0))
+    (let ((mock (make-mock-function (lambda (token integer-p)
+                                       (declare (ignore integer-p))
+                                       (parse-integer token)))))
       (let ((object (parse "{\"a\":1,\"A\":2}"
                            :key-decoder #'string-downcase
                            :duplicate-key-policy :first
-                           :number-decoder (lambda (token integer-p)
-                                             (declare (ignore integer-p))
-                                             (incf calls)
-                                             (parse-integer token)))))
-        (expect (= calls 2) :to-be-truthy)
+                           :number-decoder mock)))
+        (expect (length (mock-calls mock)) :to-be 2)
         (expect (= (gethash "a" object) 1) :to-be-truthy))))
 
   (it "parses mixed RFC whitespace in vector and list arrays"
@@ -159,68 +155,89 @@
       (text)
     (signals json-parse-error (parse text :max-depth 1))))
 
+(defun build-large-object ()
+  "Return, as two values, the JSON text for a 4096-member object (\"k0\":0 through
+\"k4095\":4095) and the member count itself, so BEFORE-EACH can rebuild an
+identical large fixture before every IT in the \"large objects\" group instead of
+sharing one mutable object across them."
+  (let ((member-count 4096))
+    (values
+      (with-output-to-string (stream)
+        (write-char #\{ stream)
+        (dotimes (index member-count)
+          (unless (zerop index) (write-char #\, stream))
+          (format stream "\"k~D\":~D" index index))
+        (write-char #\} stream))
+      member-count)))
+
 (describe "large objects"
   ;; A four-thousand-member object exercises the object accumulator well past
   ;; any incremental-growth boundary, confirming the result, the resource
   ;; bounds, and the callback firing order are all independent of object size.
-  (it "parses a large object across trailing suffixes and enforces its bounds"
-    (let* ((member-count 4096)
-           (object-text
-             (with-output-to-string (stream)
-               (write-char #\{ stream)
-               (dotimes (index member-count)
-                 (unless (zerop index) (write-char #\, stream))
-                 (format stream "\"k~D\":~D" index index))
-               (write-char #\} stream))))
-      ;; Final contents are correct regardless of trailing whitespace.
+  (let (object-text member-count)
+    (before-each
+      (setf (values object-text member-count) (build-large-object)))
+
+    (it "parses a large object correctly regardless of the whitespace suffix that follows it"
       (dolist (suffix (list "" " " (string #\Tab) (string #\Newline) (string #\Return)
                             (format nil "~C~C~C~C" #\Space #\Tab #\Newline #\Return)
                             (make-string (* 1024 1024) :initial-element #\Space)))
         (let ((value (parse (concatenate 'string object-text suffix))))
           (expect (= (hash-table-count value) member-count) :to-be-truthy)
           (expect (= (gethash "k0" value) 0) :to-be-truthy)
-          (expect (= (gethash "k4095" value) 4095) :to-be-truthy)))
-      ;; A non-whitespace suffix is trailing data at exactly the object's end.
+          (expect (= (gethash "k4095" value) 4095) :to-be-truthy))))
+
+    (it "reports trailing data at exactly the object's end when a non-whitespace suffix follows"
       (let ((condition (capture-json-parse-error (parse (concatenate 'string object-text "x")))))
         (expect (= (json-parse-error-position condition) (length object-text)) :to-be-truthy)
         (expect (json-parse-error-path condition) :to-be-falsy)
-        (expect (string= (json-parse-error-expected condition) "end of input") :to-be-truthy))
-      ;; The member bound still fires on the large object.
+        (expect (string= (json-parse-error-expected condition) "end of input") :to-be-truthy)))
+
+    (it "enforces the max-object-members bound on a large object"
       (let ((condition (capture-json-parse-error
                         (parse object-text :max-object-members (1- member-count)))))
         (expect (json-parse-error-path condition) :to-be-falsy)
         (expect (string= (json-parse-error-expected condition) "fewer object members")
-                :to-be-truthy))
-      ;; Key/number decoders and the object hook each fire once per member, in order.
-      (let ((key-count 0) (number-count 0) (trace nil))
+                :to-be-truthy)))
+
+    (it "fires the key decoder and number decoder exactly once per member and returns a fully populated table"
+      (let ((key-count 0) (number-count 0))
         (let ((value (parse object-text
-                            :key-decoder (lambda (key)
-                                           (incf key-count)
-                                           (when (or (= key-count 1) (= key-count member-count))
-                                             (push (list :key key-count key) trace))
-                                           key)
+                            :key-decoder (lambda (key) (incf key-count) key)
                             :number-decoder (lambda (token integer-p)
+                                              (declare (ignore integer-p))
                                               (incf number-count)
-                                              (when (or (= number-count 1)
-                                                        (= number-count member-count))
-                                                (push (list :number number-count token integer-p)
-                                                      trace))
-                                              (parse-integer token))
-                            :object-hook (lambda (object)
-                                           (push (list :object (hash-table-count object)
-                                                       (gethash "k4095" object))
-                                                 trace)
-                                           object))))
+                                              (parse-integer token)))))
           (expect (= key-count member-count) :to-be-truthy)
           (expect (= number-count member-count) :to-be-truthy)
-          (expect (nreverse trace)
-                  :to-equal (list (list :key 1 "k0")
-                                  (list :number 1 "0" t)
-                                  (list :key member-count "k4095")
-                                  (list :number member-count "4095" t)
-                                  (list :object member-count 4095)))
-          (expect (= (hash-table-count value) member-count) :to-be-truthy)))
-      ;; A throwing object hook is reported at the object's end, with no path.
+          (expect (= (hash-table-count value) member-count) :to-be-truthy))))
+
+    (it "invokes the key decoder, number decoder, and object hook in order for the first and last members"
+      (let ((key-count 0) (number-count 0) (trace nil))
+        (parse object-text
+               :key-decoder (lambda (key)
+                              (incf key-count)
+                              (when (or (= key-count 1) (= key-count member-count))
+                                (push (list :key key-count key) trace))
+                              key)
+               :number-decoder (lambda (token integer-p)
+                                  (incf number-count)
+                                  (when (or (= number-count 1) (= number-count member-count))
+                                    (push (list :number number-count token integer-p) trace))
+                                  (parse-integer token))
+               :object-hook (lambda (object)
+                              (push (list :object (hash-table-count object)
+                                          (gethash "k4095" object))
+                                    trace)
+                              object))
+        (expect (nreverse trace)
+                :to-equal (list (list :key 1 "k0")
+                                (list :number 1 "0" t)
+                                (list :key member-count "k4095")
+                                (list :number member-count "4095" t)
+                                (list :object member-count 4095)))))
+
+    (it "reports a throwing object hook at the object's end with no path"
       (let ((condition (capture-json-parse-error
                         (parse object-text
                                :object-hook (lambda (object)

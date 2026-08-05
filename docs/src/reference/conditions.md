@@ -104,3 +104,20 @@ Both conditions are subtypes of `error`, so ordinary `handler-case` /
   (json-kit:json-serialization-error (c)
     (report-bad-output c)))
 ```
+
+## The shared base condition
+
+`json-parse-error` and `json-serialization-error` both derive from
+`json-kit-error`, the base of every condition this library signals. Catch it
+when you want to react to any failure from `cl-json-kit` without
+distinguishing parse from serialization failures:
+
+```lisp
+(handler-case
+    (process (json-kit:stringify (json-kit:parse input)))
+  (json-kit:json-kit-error (c)
+    (report-json-failure c)))
+```
+
+`json-kit-error` carries no slots of its own — reach for the reader table
+above once you catch a specific condition type.

@@ -69,6 +69,13 @@ comparison so a failure report identifies which corpus file broke."
       (expect (list name (conformance-outcome (conformance-text parts)))
               :to-equal (list name expected)))))
 
+;; +MUST-ACCEPT+, +MUST-REJECT+, and +IMPLEMENTATION-DEFINED+ below are vendored
+;; verbatim from the JSONTestSuite corpus (see the file header). Several entries
+;; exceed the 100-column guideline (CODING_STANDARD.md) because the width comes
+;; from the fixture's own JSON content -- e.g. a 500-nested-array string or a
+;; long numeric literal -- not from unwrapped Lisp structure; wrapping the
+;; surrounding list would not shorten them. Exempt this table rather than
+;; force inconsistent per-line wrapping.
 (defparameter +must-accept+
   '(
     ("y_array_arraysWithSpaces" ("[[]   ]"))

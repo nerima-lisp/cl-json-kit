@@ -8,7 +8,8 @@
 (in-package #:asdf-user)
 
 (asdf:defsystem "cl-json-kit"
-  :description "Dependency-free JSON reader and writer for Common Lisp strings and character streams"
+  :description "Dependency-free JSON reader and writer for Common Lisp
+strings and character streams"
   :long-description "A JSON parser/serializer inspired by JavaScript's JSON.parse/JSON.stringify
 and Python's json module.  Object/array shape is decided explicitly at parse time (never guessed
 from the shape of a cons list afterwards), UTF-16 surrogate pairs in \\uXXXX escapes are decoded
@@ -35,7 +36,8 @@ correctly, and parsing can be bounded with a timeout."
                (:file "reader")
                (:file "reader-stream")
                (:file "writer-state")
-               (:file "writer-scalars")
+               (:file "writer-strings")
+               (:file "writer-numbers")
                (:file "writer-collections")
                (:file "writer")
                (:file "conversion"))
@@ -64,7 +66,8 @@ correctly, and parsing can be bounded with a timeout."
                (:file "reader-errors-test")
                (:file "reader-callbacks-test")
                (:file "reader-streaming-test")
-               (:file "writer-scalars-test")
+               (:file "writer-numbers-test")
+               (:file "writer-collections-test")
                (:file "writer-strings-test")
                (:file "writer-formatting-test")
                (:file "writer-limits-test")

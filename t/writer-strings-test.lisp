@@ -148,6 +148,69 @@
                        (write-char #\" stream))))
       (expect (string= (stringify input :max-output-length nil) expected) :to-be-truthy)))
 
+  (it "reaches the buffered path through its backslash-only trigger"
+    ;; The buffered path's own entry guard checks the first 16 characters for
+    ;; a quote OR a backslash; every other buffered-path test here happens to
+    ;; lead with a quote, so the backslash disjunct has no test of its own
+    ;; without an input that contains a backslash but never a quote.
+    (let* ((input (make-string 200 :initial-element #\\))
+           (expected (with-output-to-string (stream)
+                       (write-char #\" stream)
+                       (loop repeat 200 do (write-string "\\\\" stream))
+                       (write-char #\" stream))))
+      (expect (string= (stringify input :max-output-length nil) expected) :to-be-truthy)))
+
+  (it "flushes the buffer mid-run when a dense escape run exceeds the fixed 8192-character cap"
+    ;; The buffered path's scratch buffer is SIZE*2 for SIZE < 4096 but a fixed
+    ;; 8192 above that, so a long enough escape-dense string (every character a
+    ;; 2-character escape) fills it before the string ends, forcing an
+    ;; in-loop flush rather than only the unconditional one after the loop.
+    (dolist (character (list #\" #\\))
+      (let* ((input (make-string 5000 :initial-element character))
+             (escape (if (char= character #\") "\\\"" "\\\\"))
+             (expected (with-output-to-string (stream)
+                         (write-char #\" stream)
+                         (loop repeat 5000 do (write-string escape stream))
+                         (write-char #\" stream))))
+        (expect (string= (stringify input :max-output-length nil) expected) :to-be-truthy))))
+
+  (it "flushes the buffer mid-run when a long plain-character tail fills it exactly"
+    ;; Same fixed-8192-buffer overflow, but reached by accumulating one
+    ;; character at a time through the plain-character arm instead of two at a
+    ;; time through an escape arm -- a distinct WHEN guard in the source.
+    (let* ((input (concatenate 'string (make-string 128 :initial-element #\")
+                               (make-string 8872 :initial-element #\a)))
+           (expected (with-output-to-string (stream)
+                       (write-char #\" stream)
+                       (loop repeat 128 do (write-string "\\\"" stream))
+                       (loop repeat 8872 do (write-char #\a stream))
+                       (write-char #\" stream))))
+      (expect (string= (stringify input :max-output-length nil) expected) :to-be-truthy)))
+
+  (it "finds a buffered-path trigger character after leading plain characters"
+    ;; Every other buffered-path test here happens to have its qualifying
+    ;; quote/backslash at index 0, so the entry guard's inner OR only ever
+    ;; short-circuits true immediately. A trigger character later in the
+    ;; first 16 exercises the OR genuinely returning NIL for the characters
+    ;; ahead of it.
+    (let* ((input (concatenate 'string (make-string 10 :initial-element #\a)
+                               (make-string 12 :initial-element #\")
+                               (make-string 106 :initial-element #\a)))
+           (expected (with-output-to-string (stream)
+                       (write-char #\" stream)
+                       (loop repeat 10 do (write-char #\a stream))
+                       (loop repeat 12 do (write-string "\\\"" stream))
+                       (loop repeat 106 do (write-char #\a stream))
+                       (write-char #\" stream))))
+      (expect (string= (stringify input :max-output-length nil) expected) :to-be-truthy)))
+
+  (it "takes the run-flushing path for a short string even with MAX-OUTPUT-LENGTH NIL"
+    ;; The buffered path requires SIZE >= 128 in addition to MAX-OUTPUT-LENGTH
+    ;; being NIL; a short string with a NIL bound must still exercise that
+    ;; size guard's false branch rather than skipping it because the NIL
+    ;; check alone already looked satisfied.
+    (expect (stringify "short" :max-output-length nil) :to-equal "\"short\""))
+
   (it "rejects a raw surrogate reached via the buffered path"
     (let ((input (concatenate 'string (make-string 150 :initial-element #\")
                               (string (code-char #xd800)))))

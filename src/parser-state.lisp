@@ -54,10 +54,7 @@
   (max-object-members 1000000 :type integer)
   (context "json"))
 
-(declaim (inline ps-eof-p ps-peek ps-advance whitespace-char-p skip-whitespace expect-char))
-
-(defun ps-eof-p (state)
-  (>= (ps-pos state) (ps-length state)))
+(declaim (inline ps-peek ps-advance whitespace-char-p skip-whitespace expect-char))
 
 (defun ps-peek (state &optional (offset 0))
   "The character OFFSET positions ahead of the cursor, or NIL past end of input."

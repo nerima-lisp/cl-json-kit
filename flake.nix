@@ -22,12 +22,12 @@
     # branch, so an upstream push to main would change this build without
     # warning.
     cl-nix-forge = {
-      url = "github:nerima-lisp/cl-nix-forge/v0.4.0";
+      url = "github:nerima-lisp/cl-nix-forge/v0.5.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     cl-weave = {
-      url = "github:nerima-lisp/cl-weave/v1.1.4";
+      url = "github:nerima-lisp/cl-weave/v1.3.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
