@@ -78,9 +78,21 @@ small nonnegative index or an escaped string, cycle-safe."
     (safe-diagnostic-snippet expected 128)))
 
 ;;; ---------------------------------------------------------------------
+;;; Base condition
+;;; ---------------------------------------------------------------------
+(define-condition json-kit-error (error)
+  ()
+  (:documentation
+   "The base condition of every condition CL-JSON-KIT signals.  A caller that
+wants to catch this package's whole failure surface in one HANDLER-CASE
+clause should catch this type instead of ERROR: JSON-PARSE-ERROR and
+JSON-SERIALIZATION-ERROR both derive from it, and any condition type this
+library adds in the future will too."))
+
+;;; ---------------------------------------------------------------------
 ;;; Parse errors
 ;;; ---------------------------------------------------------------------
-(define-condition json-parse-error (error)
+(define-condition json-parse-error (json-kit-error)
   ((position :initarg :position :reader json-parse-error-position
              :documentation "Zero-based character index of the offending input.")
    (line :initarg :line :initform 1 :reader json-parse-error-line
@@ -153,7 +165,7 @@ or NIL when it has nothing more specific to report.")
 ;;; ---------------------------------------------------------------------
 ;;; Serialization errors
 ;;; ---------------------------------------------------------------------
-(define-condition json-serialization-error (error)
+(define-condition json-serialization-error (json-kit-error)
   ((message :initarg :message :initform "JSON serialization failed"
             :reader json-serialization-error-message
             :documentation "Bounded description of why serialization failed.")

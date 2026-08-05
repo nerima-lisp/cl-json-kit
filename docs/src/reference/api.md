@@ -88,11 +88,19 @@ depending on their value, printed form, or type.
 Test these values with the predicates; do not depend on their printed form or
 implementation type. → [Data Model and Mapping](../guide/data-model.md#opaque-null-and-false)
 
+## Base condition
+
+| Symbol | Kind | Meaning |
+| --- | --- | --- |
+| `json-kit-error` | condition | Base of every condition this library signals (subtype of `error`). Carries no slots. |
+
+→ [Error Handling](conditions.md#the-shared-base-condition)
+
 ## Parse diagnostics
 
 | Symbol | Kind | Meaning |
 | --- | --- | --- |
-| `json-parse-error` | condition | Signalled for malformed input (subtype of `error`). |
+| `json-parse-error` | condition | Signalled for malformed input (subtype of `json-kit-error`). |
 | `json-parse-error-position` | reader | Zero-based character offset. |
 | `json-parse-error-line` | reader | One-based line. |
 | `json-parse-error-column` | reader | One-based column. |
@@ -107,7 +115,7 @@ implementation type. → [Data Model and Mapping](../guide/data-model.md#opaque-
 
 | Symbol | Kind | Meaning |
 | --- | --- | --- |
-| `json-serialization-error` | condition | Signalled for unsupported output (subtype of `error`). |
+| `json-serialization-error` | condition | Signalled for unsupported output (subtype of `json-kit-error`). |
 | `json-serialization-error-message` | reader | Bounded failure description. |
 | `json-serialization-error-path` | reader | Path to the offending value. |
 

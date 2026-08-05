@@ -19,6 +19,8 @@
    #:+json-false+
    #:json-null-p
    #:json-false-p
+   ;; Base condition
+   #:json-kit-error
    ;; Parse diagnostics
    #:json-parse-error
    #:json-parse-error-position

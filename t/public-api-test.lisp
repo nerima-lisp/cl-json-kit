@@ -14,6 +14,8 @@
     "WRITE-JSON" "STRINGIFY"
     ;; Opaque JSON null / false
     "+JSON-NULL+" "+JSON-FALSE+" "JSON-NULL-P" "JSON-FALSE-P"
+    ;; Base condition
+    "JSON-KIT-ERROR"
     ;; Parse diagnostics
     "JSON-PARSE-ERROR"
     "JSON-PARSE-ERROR-POSITION" "JSON-PARSE-ERROR-LINE" "JSON-PARSE-ERROR-COLUMN"
