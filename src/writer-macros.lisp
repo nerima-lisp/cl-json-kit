@@ -109,6 +109,20 @@ WRITE-JSON-ORDERED-OBJECT open and close a JSON aggregate."
        (when (and *json-pretty* (plusp ,count-var)) (emit-indent ,level))
        (emit-character ,close))))
 
+(defmacro with-json-aggregate-brackets ((value open close level count) &body body)
+  "Serialize an aggregate: check LEVEL against the depth limit via ENSURE-DEPTH,
+guard VALUE against reference cycles via WITH-ACTIVE-AGGREGATE, then run BODY
+(which must call EMIT-JSON-MEMBER for each member) as WITH-JSON-BRACKETS' body
+between OPEN and CLOSE at LEVEL with member COUNT.  This is the one place
+WRITE-JSON-ARRAY-SEQUENCE, WRITE-JSON-OBJECT, and WRITE-JSON-ORDERED-OBJECT
+combine depth checking, cycle guarding, and bracket emission; callers compute
+and validate COUNT (e.g. via ENSURE-ELEMENT-COUNT) before this form."
+  `(progn
+     (ensure-depth ,level)
+     (with-active-aggregate (,value)
+       (with-json-brackets (,open ,close ,level ,count)
+         ,@body))))
+
 (defmacro emit-json-member ((index level) &body body)
   "Within a WITH-JSON-BRACKETS body, separate this member from the previous one
 with a comma (unless INDEX is zero), indent it for pretty output, then run BODY

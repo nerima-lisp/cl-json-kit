@@ -86,7 +86,7 @@ by [`cl-json-kit.asd`](https://github.com/nerima-lisp/cl-json-kit/blob/main/cl-j
 | Shared control flow | `src/reader-macros.lisp`, `src/writer-macros.lisp` |
 | Conditions | `src/conditions.lisp` |
 | Reader | `src/parser-state.lisp`, `src/reader-strings.lisp`, `src/reader-numbers.lisp`, `src/reader-collections.lisp`, `src/reader.lisp`, `src/reader-stream.lisp` |
-| Writer | `src/writer-state.lisp`, `src/writer-scalars.lisp`, `src/writer-collections.lisp`, `src/writer.lisp` |
+| Writer | `src/writer-state.lisp`, `src/writer-numbers.lisp`, `src/writer-strings.lisp`, `src/writer-collections.lisp`, `src/writer.lisp` |
 | Conversion | `src/conversion.lisp` |
 
 The single public package `json-kit` is defined in `src/package.lisp`; only the
