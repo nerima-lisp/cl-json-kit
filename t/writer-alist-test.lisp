@@ -35,7 +35,8 @@
 
   (it "validates conversion shape, key type, and element bounds"
     (expect (= (hash-table-count (alist->json-object '() :max-elements 0)) 0) :to-be-truthy)
-    (expect (= (gethash "a" (alist->json-object (list (cons "a" 1)) :max-elements 1)) 1) :to-be-truthy)
+    (expect (= (gethash "a" (alist->json-object (list (cons "a" 1)) :max-elements 1)) 1)
+            :to-be-truthy)
     (signals json-serialization-error (alist->json-object (list (cons "a" 1)) :max-elements 0))
     (signals json-serialization-error (alist->json-object (cons (cons "a" 1) 2)))
     (signals json-serialization-error (alist->json-object (list "malformed")))

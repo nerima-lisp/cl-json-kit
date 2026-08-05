@@ -78,7 +78,8 @@
   (it "reports exact coordinates and diagnostics for array-position errors"
     (dolist (case (list (list (format nil "[0,~% ?]") nil 5 2 2 (list 1) "JSON value")
                         (list "{\"outer\":[0,]}" nil 12 1 13 (list "outer") "array value")
-                        (list "[1,2]" (list :max-array-elements 1) 3 1 4 nil "fewer array elements")))
+                        (list "[1,2]" (list :max-array-elements 1) 3 1 4 nil
+                              "fewer array elements")))
       (destructuring-bind (text options position line column path diagnostic) case
         (let ((condition (capture-json-parse-error
                           (apply #'parse text (list* :context "array-regression" options)))))
