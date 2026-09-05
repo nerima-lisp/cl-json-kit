@@ -1,13 +1,6 @@
 ;;;; src/reader-collections.lisp
 ;;;;
-;;;; The recursive core: value dispatch, object and array parsing, and the
-;;;; continuation-passing callback plumbing they lean on.
-;;;;
-;;;; Design note (the whole point of this library): PARSE-OBJECT always reads
-;;;; "{...}" as key/value pairs and PARSE-ARRAY always reads "[...]" as values.
-;;;; Whether the pairs become a HASH-TABLE or an ALIST, and the values a
-;;;; SIMPLE-VECTOR or a LIST, is decided once here from :OBJECT-TYPE /
-;;;; :ARRAY-TYPE -- never guessed later by inspecting already-built Lisp data.
+;;;; Value dispatch, object and array parsing, and callback plumbing.
 (in-package #:json-kit)
 
 ;;; ---------------------------------------------------------------------

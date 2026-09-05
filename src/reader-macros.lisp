@@ -1,14 +1,7 @@
 ;;;; src/reader-macros.lisp
 ;;;;
-;;;; The reader's cross-cutting control-flow, named once here as a macro so
-;;;; the reader-* logic files read as intent ("with this path pushed", "invoke
-;;;; this callback then continue") rather than repeated let/unwind-protect
-;;;; bookkeeping.
-;;;;
-;;;; The bodies reference functions and specials defined in later files
-;;;; (PS-PATH, PARSE-ERROR-HERE, ...); that is fine because a macro's
-;;;; expansion is only evaluated where it is *used*, and the :SERIAL system
-;;;; loads those definitions before any use site is compiled.
+;;;; Reader control-flow macros. Definitions referenced by their expansions
+;;;; are loaded before the reader files that use them.
 (in-package #:json-kit)
 
 ;;; ---------------------------------------------------------------------

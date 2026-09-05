@@ -1,12 +1,6 @@
 ;;;; src/reader-numbers.lisp
 ;;;;
-;;;; JSON numbers.  SCAN-NUMBER validates RFC 8259 grammar while collecting
-;;;; sign, zero, and decimal-scale metadata for the range decoders.  Plain
-;;;; integers are decoded by SCAN-INTEGER-FAST alone -- it never falls back to
-;;;; SCAN-NUMBER without also being a float or a grammar error -- so
-;;;; DECODE-FLOAT-RANGE (producing a double or, via EXACT-NUMBER-RANGE-VALUE,
-;;;; an exact ratio) is SCAN-NUMBER's only decoder.  PARSE-NUMBER wires them
-;;;; together and consults an optional user NUMBER-DECODER first.
+;;;; JSON number scanning and decoding.
 (in-package #:json-kit)
 
 (declaim (inline ascii-json-digit-p ascii-json-digit-value))

@@ -41,8 +41,8 @@ Put the repository where ASDF can find it — for example under
 (asdf:load-system "cl-json-kit")
 ```
 
-Everything a caller needs is exported from the single `json-kit` package.
-Every example on this site references symbols with the `json-kit:` prefix.
+The public API is in the `json-kit` package. Examples on this site use the
+`json-kit:` package prefix.
 
 ## Supported runtime
 
@@ -83,7 +83,7 @@ JSON `false` and `null` are represented by opaque sentinels, **not** by Lisp
 
 ## Choose the container shape
 
-The reader never guesses; you select the container types explicitly.
+Select the container types explicitly with `:array-type` and `:object-type`.
 
 ```lisp
 (json-kit:parse "[1,2,3]" :array-type :list)
@@ -134,7 +134,7 @@ returns the original value:
 ## Scan concatenated values
 
 `parse-prefix` reads the first value and returns the exclusive end index, so
-you can walk a stream of back-to-back values:
+A stream of back-to-back values can be read with:
 
 ```lisp
 (multiple-value-list (json-kit:parse-prefix "  [1,2] next"))

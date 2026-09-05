@@ -1,9 +1,7 @@
 ;;;; t/rfc8259-conformance-test.lisp
 ;;;;
-;;;; RFC 8259 conformance against the nst/JSONTestSuite parsing corpus
-;;;; (https://github.com/nst/JSONTestSuite, MIT).  The corpus is vendored here
-;;;; as data rather than fetched, so conformance is a permanent regression gate
-;;;; that runs offline inside the Nix sandbox.
+;;;; RFC 8259 conformance cases from nst/JSONTestSuite
+;;;; (https://github.com/nst/JSONTestSuite, MIT), vendored for offline tests.
 ;;;;
 ;;;; Case names carry the corpus's own verdict:
 ;;;;   y_ -- every conforming parser MUST accept

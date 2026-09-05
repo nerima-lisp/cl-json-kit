@@ -5,10 +5,9 @@ human-readable progress to standard error and machine-readable **TSV** to
 standard output, with full provenance (host, SBCL version, pinned sources, and
 execution order) embedded in the output itself.
 
-!!! info "Full detail lives with the code"
+!!! info "Benchmark details"
     This page summarizes how to run the harnesses and read their output. The
-    authoritative, exhaustive description — every environment variable, the
-    complete TSV schema, and each correctness gate — is in
+    environment variables, TSV schema, and correctness gates are documented in
     [`benchmark/README.md`](https://github.com/nerima-lisp/cl-json-kit/blob/main/benchmark/README.md).
 
 ## The two harnesses
@@ -85,14 +84,11 @@ string.
     conformance implementation — a shared interpretation or defect could pass.
     These fixtures are not a complete JSON conformance suite.
 
-## Interpreting the numbers
+## Scope of measurements
 
-These measurements support comparisons **only** for the recorded corpus,
-operation and mode, pinned source state, SBCL version, settings, execution
-order, and host. They do not establish that any implementation is universally
-the "fastest" JSON library.
+These measurements apply to the recorded corpus, operation and mode, pinned
+source state, SBCL version, settings, execution order, and host. They do not
+measure parser-core performance when canonical parse normalization is included.
 
-!!! warning "Publish a claim only with its artifact"
-    If you cite a result, publish the TSV artifact alongside it and scope the
-    claim to the exact workload and environment recorded there. The provenance
-    rows exist precisely so a number can be interpreted later.
+The TSV artifact records the workload and environment needed to reproduce a
+result. Interpret each result with those recorded conditions.

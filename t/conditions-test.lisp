@@ -1,13 +1,7 @@
 ;;;; t/conditions-test.lisp
 ;;;;
-;;;; The bounded-diagnostic helpers in src/conditions.lisp are shared by both
-;;;; condition types but only reachable indirectly through PARSE/STRINGIFY
-;;;; call sites elsewhere in the suite, which never happen to overrun a bound.
-;;;; These specs exercise the truncation and cycle-safety guarantees directly,
-;;;; through BOUNDED-JSON-PARSE-ERROR/BOUNDED-JSON-SERIALIZATION-ERROR -- the
-;;;; only place bounding happens now that it cannot live in an
-;;;; INITIALIZE-INSTANCE :AFTER method (SBCL's condition classes never invoke
-;;;; one, so raw MAKE-CONDITION deliberately does not bound anything).
+;;;; Direct coverage for bounded diagnostic construction, including truncation
+;;;; and cyclic values that ordinary PARSE/STRINGIFY paths do not reach.
 (in-package #:cl-json-kit/test)
 
 (describe "diagnostic snippet and path bounding"

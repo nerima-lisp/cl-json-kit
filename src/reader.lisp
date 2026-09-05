@@ -1,10 +1,6 @@
 ;;;; src/reader.lisp
 ;;;;
-;;;; The string reading API: PARSE (one complete JSON text) and PARSE-PREFIX
-;;;; (one value plus its exclusive end index).  All option validation happens
-;;;; here, before any character of untrusted input is interpreted, and every
-;;;; bad option is reported as a JSON-PARSE-ERROR rather than a Lisp error.
-;;;; Stream framing (READ-JSON) builds on this and lives in reader-stream.lisp.
+;;;; String-based parsing entry points.
 (in-package #:json-kit)
 
 (defun validate-timeout-seconds (timeout-seconds context text)

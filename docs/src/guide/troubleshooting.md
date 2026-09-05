@@ -1,7 +1,7 @@
 # Troubleshooting
 
-Symptoms and answers that come up once you go past the basic examples. For the
-option-by-option reference, see [Reading JSON](reading.md) and
+Common issues and their causes. For the option reference, see
+[Reading JSON](reading.md) and
 [Writing JSON](writing.md).
 
 ## Is `cl-json-kit` thread-safe?
@@ -15,7 +15,7 @@ for all of them with `let` at the start of every call, so concurrent calls on
 different threads never observe each other's bindings.
 
 Two calls in different threads that each parse their own string and stringify
-their own value need no external locking. What you must still manage
+their own value need no external locking. Applications must still manage
 yourself:
 
 - **A stream shared across threads.** `write-json` writes to whatever stream
@@ -57,10 +57,10 @@ grow.
 [Benchmarks](../reference/benchmarks.md) covers throughput, measured with the same
 correctness-gated harness against all four. The API-level difference that
 motivates this library, independent of speed, is explicit shape control: JSON
-object/array shape is always chosen by you (`:object-type` / `:array-type`),
+object/array shape is selected with `:object-type` / `:array-type`,
 never inferred from whether a Lisp list of conses happens to look like an
-alist. See [Why another JSON library?](../index.md#why-another-json-library)
-and [Data Model and Mapping](data-model.md) for the full rationale. This page
+alist. See [JSON representation](../index.md#json-representation)
+and [Data Model and Mapping](data-model.md) for the mapping rules. This page
 does not attempt a feature-by-feature matrix against the other libraries —
 consult their own documentation for what they support.
 

@@ -1,8 +1,8 @@
 # Conversion Helpers
 
-Because a plain list is always a JSON *array*, converting an alist into a JSON
-*object* is an **explicit** step. These helpers provide that bridge, plus an
-ordered object representation that preserves member order and duplicate keys.
+A plain list is always a JSON *array*. Converting an alist into a JSON *object*
+is an **explicit** step. These helpers provide that conversion and an ordered
+object representation that preserves member order and duplicate keys.
 
 ## Overview
 

@@ -139,7 +139,7 @@ representation; see [Conversion Helpers](conversion.md).
 `parse-prefix` parses the first value at or after `:index` (default `0`) and
 returns **two values**: the decoded value and the exclusive end index. Leading
 JSON whitespace is accepted; whitespace and any other data after the value
-remain unconsumed. This makes it the tool for scanning back-to-back values:
+remain unconsumed. Use it to scan back-to-back values:
 
 ```lisp
 (multiple-value-list (json-kit:parse-prefix "  [1,2] next"))

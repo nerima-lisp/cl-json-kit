@@ -1,7 +1,7 @@
 # Recipes
 
-Practical patterns that combine the reader, writer, and helpers. Each recipe is
-self-contained and uses only exported symbols. For the full option lists, see
+Examples combining the reader, writer, and helpers. Each recipe uses only
+exported symbols. For the option lists, see
 [Reading JSON](reading.md) and [Writing JSON](writing.md).
 
 ## Round-trip a document unchanged

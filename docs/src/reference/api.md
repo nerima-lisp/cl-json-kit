@@ -1,12 +1,10 @@
 # API Reference
 
-Everything a caller needs is exported from the single `json-kit` package:
-the two reading entry points, the two writing entry points, the opaque
+The `json-kit` package exports the reading and writing entry points, the opaque
 `null` / `false` sentinels and their predicates, the structured conditions, and
-the explicit alist ↔ object bridges. Nothing else is exported.
+the explicit alist ↔ object bridges.
 
-This page is a compact index. Each entry links to the guide section with
-examples and the full discussion.
+Each entry links to the corresponding guide section with examples and details.
 
 ## Reading
 
@@ -135,7 +133,7 @@ implementation type. → [Data Model and Mapping](../guide/data-model.md#opaque-
 
 ## Default option values
 
-For convenience, the defaults enforced by the entry points:
+The defaults enforced by the entry points are:
 
 | Option | Default | Applies to |
 | --- | --- | --- |

@@ -156,10 +156,7 @@
     (signals json-parse-error (parse text :max-depth 1))))
 
 (defun build-large-object ()
-  "Return, as two values, the JSON text for a 4096-member object (\"k0\":0 through
-\"k4095\":4095) and the member count itself, so BEFORE-EACH can rebuild an
-identical large fixture before every IT in the \"large objects\" group instead of
-sharing one mutable object across them."
+  "Return the JSON text for a 4096-member object and its member count."
   (let ((member-count 4096))
     (values
       (with-output-to-string (stream)

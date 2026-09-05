@@ -29,9 +29,8 @@
       (setf (gethash "a" table) 1)
       (expect table :to-stringify-as "{\"a\":1}")))
 
-  ;; The whole point of the library: a list of conses is an array of arrays,
-  ;; never silently reinterpreted as an object.
-  (it "never guesses object intent from a list of pairs"
+  ;; Lists are arrays unless explicitly converted to objects.
+  (it "does not infer object intent from a list of pairs"
     (expect (list (list 1 2) (list 3 4)) :to-stringify-as "[[1,2],[3,4]]")
     (signals json-serialization-error (stringify (cons 1 2))))
 
@@ -44,4 +43,3 @@
       (expect (and (search "\"a\":1" json) (search "\"b\":2" json)) :to-be-truthy)
       (expect (char= (char json 0) #\{) :to-be-truthy)
       (expect (char= (char json (1- (length json))) #\}) :to-be-truthy))))
-

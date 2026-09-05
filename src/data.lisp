@@ -1,11 +1,6 @@
 ;;;; src/data.lisp
 ;;;;
-;;;; The data layer: type definitions and constant tables shared by the reader
-;;;; and the writer.  Deliberately free of behaviour -- every function that
-;;;; *acts* on these types lives in a logic file (reader-*, writer-*,
-;;;; conversion).  Keeping the shapes here means the reader and writer agree on
-;;;; one definition of "a JSON null", "a JSON false", and "an ordered object"
-;;;; instead of each inventing its own.
+;;;; Type definitions and constant tables shared by the reader and writer.
 (in-package #:json-kit)
 
 ;;; ---------------------------------------------------------------------

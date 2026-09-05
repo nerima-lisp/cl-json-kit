@@ -1,10 +1,6 @@
 ;;;; t/public-api-test.lisp
 ;;;;
-;;;; The public API is the thing this library's version number makes promises
-;;;; about, so it is pinned here rather than left implicit in src/package.lisp.
-;;;; A symbol appearing or disappearing fails these specs, which forces the
-;;;; addition or removal to be a deliberate, semver-classified decision instead
-;;;; of an accident of editing an export list.
+;;;; Pin the exported API so changes are deliberate and semver-classified.
 (in-package #:cl-json-kit/test)
 
 (defparameter +public-api+

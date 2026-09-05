@@ -1,9 +1,6 @@
 ;;;; src/conversion.lisp
 ;;;;
-;;;; Explicit bridges between ALISTs and the HASH-TABLE / ordered JSON-OBJECT
-;;;; representations.  They exist precisely so a caller who *does* mean "this
-;;;; alist is a JSON object" says so in one place, instead of STRINGIFY trying
-;;;; to infer object intent from the shape of an arbitrary cons list.
+;;;; Explicit bridges between ALISTs and JSON object representations.
 (in-package #:json-kit)
 
 (defun validate-conversion-max-elements (max-elements)

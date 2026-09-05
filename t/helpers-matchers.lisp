@@ -1,8 +1,6 @@
 ;;;; t/helpers-matchers.lisp
 ;;;;
-;;;; Domain-specific expectations and generators shared by every spec file, so
-;;;; the specs read in the vocabulary of the library ("parses as", "stringifies
-;;;; as", "round-trips") instead of raw predicate soup.
+;;;; Shared matchers and generators for the test suite.
 (in-package #:cl-json-kit/test)
 
 (defmatcher :to-parse-as (actual expected)
@@ -38,10 +36,8 @@ EXPECTED operand."
                 (code-char 1) #\a #\b #\z #\SPACE)
           'string))
 
-;;; JSON's own punctuation and token vocabulary, so a fuzzer drawing from this
-;;; alphabet has a real chance of assembling near-valid structure -- braces,
-;;; digits, literal prefixes -- instead of only ever producing plain prose
-;;; that PARSE rejects in the first two characters.
+;;; Include JSON punctuation and token characters so generated inputs exercise
+;;; parser branches beyond immediate rejection.
 (defparameter +json-syntax-alphabet+
   (coerce (list #\{ #\} #\[ #\] #\: #\, #\" #\\ #\- #\. #\0 #\1 #\9
                 #\t #\r #\u #\e #\f #\a #\l #\s #\n

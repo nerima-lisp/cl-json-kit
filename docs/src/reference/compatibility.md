@@ -1,8 +1,8 @@
 # Compatibility Promise
 
-`cl-json-kit` follows [Semantic Versioning](https://semver.org/). Reaching
-1.0.0 is a commitment, not a milestone: from this release on, the surface
-described below will not change incompatibly without a major version bump.
+`cl-json-kit` follows [Semantic Versioning](https://semver.org/). From 1.0.0
+on, the surface described below will not change incompatibly without a major
+version bump.
 
 ## What is covered
 

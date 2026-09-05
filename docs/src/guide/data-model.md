@@ -1,8 +1,7 @@
 # Data Model and Mapping
 
-The defining principle of `cl-json-kit` is that **JSON shape is decided
-explicitly, never inferred from the structure of a Lisp value**. This page
-documents the full correspondence in both directions.
+**JSON shape is decided explicitly, never inferred from the structure of a Lisp
+value.** The table below shows the default correspondence in both directions.
 
 ## Mapping table
 
@@ -38,7 +37,7 @@ values**, `+json-null+` and `+json-false+`. They are deliberately *not* Lisp
     depend on their printed representation or implementation type — both are
     unspecified and may change.
 
-You can override the values the reader produces (`:null-value`,
+The reader values can be overridden with (`:null-value`,
 `:false-value`, `:true-value`) and the values the writer recognizes
 (`:null-value`, `:false-value`). This lets you map JSON `null` to `:null`, to
 `nil`, or to any marker your application already uses.

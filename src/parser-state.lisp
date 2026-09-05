@@ -1,10 +1,6 @@
 ;;;; src/parser-state.lisp
 ;;;;
-;;;; PARSER-STATE bundles the immutable configuration of one PARSE call with
-;;;; the mutable scan cursor, and this file provides the primitive operations
-;;;; over it: peeking, advancing, locating a source position, raising a located
-;;;; error, and skipping whitespace.  Everything here is small and hot; the
-;;;; grammar itself lives in the reader-* files.
+;;;; Parser state and cursor operations.
 (in-package #:json-kit)
 
 ;;; ---------------------------------------------------------------------

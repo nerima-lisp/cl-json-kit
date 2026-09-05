@@ -1,8 +1,6 @@
 ;;;; t/property-test.lisp
 ;;;;
-;;;; Property-based specs: instead of a handful of chosen examples, assert an
-;;;; invariant over many generated inputs and let cl-weave shrink any
-;;;; counterexample to a minimal failing value.
+;;;; Property-based specs over generated inputs.
 (in-package #:cl-json-kit/test)
 
 (describe "round-trip properties"

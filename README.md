@@ -51,12 +51,12 @@ The library itself has no external dependencies; only the test system uses
 `parse-prefix` returns one value plus its end index, for scanning concatenated
 values; `read-json` reads exactly one value from a character stream without
 over-consuming. See [Reading](https://nerima-lisp.github.io/cl-json-kit/guide/reading/)
-and [Writing](https://nerima-lisp.github.io/cl-json-kit/guide/writing/) for every
-option.
+and [Writing](https://nerima-lisp.github.io/cl-json-kit/guide/writing/) for the
+option reference.
 
-## Why another JSON library?
+## JSON representation
 
-**JSON shape is never guessed from Lisp contents.** A JSON object is a hash
+JSON shape is not inferred from Lisp contents. A JSON object is a hash
 table or an alist, chosen with `:object-type`; a JSON array is a vector or a
 list, chosen with `:array-type`. When writing, hash tables are objects and
 vectors and lists are arrays — an alist becomes an object only after an explicit
@@ -74,29 +74,28 @@ as an object.
 | `false` | `+json-false+` | `+json-false+` |
 | `null` | `+json-null+` | `+json-null+` |
 
-Note that `nil` is the empty list and is written as `[]`, never as `null` or
-`false`. Full rules, including ratios and rejected values, are in the
+The value `nil` is the empty list and is written as `[]`, never as `null` or
+`false`. Rules for ratios and rejected values are in the
 [Data Model](https://nerima-lisp.github.io/cl-json-kit/guide/data-model/).
 
-## What you also get
+## Tested and bounded behavior
 
-- **Measured RFC 8259 conformance.** The whole parsing corpus of
+- **RFC 8259 conformance tests.** The parsing corpus from
   [JSONTestSuite](https://github.com/nst/JSONTestSuite) is vendored into the
-  test suite and runs on every build: 95/95 must-accept cases accepted, 188/188
-  must-reject cases rejected, nothing crashing or signalling anything but
-  `json-parse-error`, and every implementation-defined answer pinned by a test.
+  test suite: 95/95 must-accept cases are accepted, 188/188 must-reject cases
+  are rejected, and implementation-defined answers are covered by tests.
   ([details](https://nerima-lisp.github.io/cl-json-kit/reference/rfc-8259/))
-- **A stable API.** From 1.0.0 on, the exported surface and its documented
-  behavior follow [Semantic Versioning](https://semver.org/), and the export
-  list is asserted by the test suite so it cannot change by accident.
+- **API stability.** From 1.0.0 on, the exported surface and its documented
+  behavior follow [Semantic Versioning](https://semver.org/). The test suite
+  checks the export list.
   ([what is and is not covered](https://nerima-lisp.github.io/cl-json-kit/reference/compatibility/))
-- **Bounded by default.** Every entry point enforces finite input, output,
+- **Default bounds.** Every entry point enforces finite input, output,
   depth, and element limits, plus an optional wall-clock timeout on SBCL.
   ([limits](https://nerima-lisp.github.io/cl-json-kit/reference/resource-limits/))
-- **Structured diagnostics.** Failures signal typed conditions carrying
+- **Diagnostics.** Failures signal typed conditions carrying
   position, line, column, path, and a bounded, sanitized snippet.
   ([error handling](https://nerima-lisp.github.io/cl-json-kit/reference/conditions/))
-- **Correct Unicode.** `\uXXXX` escapes decode UTF-16 surrogate pairs into a
+- **Unicode handling.** `\uXXXX` escapes decode UTF-16 surrogate pairs into a
   single non-BMP character; lone surrogates are rejected in both directions.
 
 ## Develop

@@ -8,7 +8,7 @@ For how to file an issue or open a pull request, see the org-wide
 
 ## Development environment
 
-The repository is a Nix flake. The simplest way to get a working toolchain is:
+The repository is a Nix flake. Enter its development shell with:
 
 ```sh
 nix develop
@@ -43,8 +43,7 @@ nix flake check
 The test system (`cl-json-kit/test`) uses `cl-weave` and lives under `t/`. It
 includes a property-based fuzzing suite over `parse`.
 
-Two files there guard the project's standing promises rather than any one
-feature, and are worth knowing about before changing them:
+Two files there enforce project-wide contracts:
 
 - **`t/public-api-test.lisp`** pins the exact set of symbols the `json-kit`
   package exports and requires a docstring on each. Adding or removing an export
@@ -63,8 +62,7 @@ feature, and are worth knowing about before changing them:
 
 ## Running the benchmarks
 
-See [Benchmarks](../reference/benchmarks.md) for the full harness
-documentation. In short:
+See [Benchmarks](../reference/benchmarks.md) for harness details. The commands are:
 
 ```sh
 # The library's own reader/writer throughput.
@@ -109,15 +107,9 @@ symbols listed there are part of the supported API. See the
   Common Lisp.
 - **Zero runtime dependencies, by design.** The runtime system depends on
   nothing outside the Common Lisp standard; only the test system uses
-  `cl-weave`. Before adding a dependency, check that it earns its keep over
-  hand-rolling the few dozen lines it would save — the
-  [nerima-lisp](https://github.com/orgs/nerima-lisp/repositories) org's other
-  packages were surveyed and none fit a pure string/stream JSON codec (e.g.
-  `cl-boundary-kit` abstracts filesystem/network/clock/process boundaries
-  this library never touches; `cl-parser-kit` is a generic parser toolkit
-  that would regress the reader's hand-tuned hot path). Don't wrap a
-  dependency in an adapter layer just to use it "properly" — use it directly
-  or not at all.
+  `cl-weave`. Before adding a dependency, confirm that it supports a portable
+  string/stream JSON codec. Use dependencies directly; do not add an adapter
+  solely to satisfy a convention.
 
 ## Building the documentation
 
@@ -147,6 +139,6 @@ workflow.
 ## Reporting a parse or serialization bug
 
 Use the [issue tracker](https://github.com/nerima-lisp/cl-json-kit/issues).
-Include the exact input, the options passed, the expected result, and what you
+Include the exact input, the options passed, the expected result, and the
 observed — the [error path and coordinates](../reference/conditions.md) from
 the signalled condition are especially helpful.

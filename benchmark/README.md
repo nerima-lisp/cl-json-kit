@@ -162,10 +162,9 @@ not constitute a complete JSON conformance suite.
 - Yason uses hash-table objects and vector arrays with its boolean and null
   parsing options enabled.
 
-These native rows intentionally retain representation and configuration
-asymmetry. They compare the libraries' configured native work, not identical
-DOM construction semantics. Native rows support claims only about these
-configured end-to-end operations.
+These native rows retain representation and configuration asymmetry. They
+compare the libraries' configured native work, not identical DOM construction
+semantics. The results apply to these configured end-to-end operations.
 
 `canonical` parse rows normalize every result to hash-table objects with string
 keys, vector arrays, `:null`, `:false`, and `t`. Parser options, dynamic
@@ -251,12 +250,10 @@ consed_bytes_min  consed_bytes_max  consed_bytes_stddev
 Stringify throughput uses the original Lisp input length; parse throughput uses
 the JSON input length.
 
-## Interpreting claims
+## Scope of measurements
 
-These measurements support comparisons only for the recorded corpus, operation
-and mode, pinned source state, SBCL version, settings, execution order, and
-host. Canonical parse rows support common-result-contract comparisons, including
-normalization overhead. Native rows support configured end-to-end comparisons
-only. Neither establishes parser-core performance or that any implementation is
-universally the "world's fastest" JSON library. Publish a claim only with the
-TSV artifact and scope it to the exact workload and environment recorded there.
+These measurements apply to the recorded corpus, operation and mode, pinned
+source state, SBCL version, settings, execution order, and host. Canonical parse
+rows include normalization overhead and therefore do not measure parser-core
+performance. Native rows measure configured end-to-end operations. The TSV
+artifact contains the workload and environment needed to reproduce the result.

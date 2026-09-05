@@ -355,9 +355,7 @@
              (princ (tsv-field field)))
     (terpri))
   (defun process-wait-with-timeout (process timeout-seconds)
-    "Poll PROCESS until it exits or TIMEOUT-SECONDS elapses, without blocking
-past the deadline the way SB-EXT:PROCESS-WAIT alone would (it has no timeout
-parameter at all -- confirmed empirically, not assumed). Returns T if the
+    "Poll PROCESS until it exits or TIMEOUT-SECONDS elapses. Returns T if the
 process exited in time, NIL if the deadline was hit."
     (let ((deadline (+ (get-internal-real-time)
                         (* timeout-seconds internal-time-units-per-second))))

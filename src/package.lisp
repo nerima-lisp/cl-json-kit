@@ -1,9 +1,6 @@
 ;;;; src/package.lisp
 ;;;;
-;;;; The single public package.  Everything a caller needs -- the two parsing
-;;;; entry points, the two writing entry points, the opaque null/false
-;;;; sentinels with their predicates, the structured conditions, and the
-;;;; explicit alist<->object bridges -- is exported here and nothing else.
+;;;; Public package definition.
 (defpackage #:json-kit
   (:use #:cl)
   (:export

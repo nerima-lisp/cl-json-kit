@@ -1,10 +1,6 @@
 ;;;; src/writer-collections.lisp
 ;;;;
-;;;; Serializing the aggregates and dispatching on Lisp type.  A HASH-TABLE (or
-;;;; ordered JSON-OBJECT) becomes a JSON object; any non-string VECTOR or LIST
-;;;; becomes a JSON array.  A plain cons list is never re-read as an alist of
-;;;; pairs -- WRITE-JSON-VALUE branches purely on type, which is exactly the
-;;;; guarantee this library sells.
+;;;; Serializing aggregate values and dispatching on Lisp type.
 (in-package #:json-kit)
 
 (defun proper-list-length (value)

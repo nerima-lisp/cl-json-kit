@@ -86,10 +86,10 @@ construction, before it reaches a condition slot. Control characters are
 escaped, snippets are capped (256 characters for text, shorter for paths and
 expected values), and paths are limited in length and made cycle-safe.
 
-This means you can log or surface a `json-parse-error` without worrying that a
-crafted input has smuggled control characters, an enormous string, or a cyclic
-structure into your logs. The bound is part of the library's
-[security posture](resource-limits.md), not just a cosmetic nicety.
+Callers can log or surface a `json-parse-error`; crafted input cannot place
+unescaped control characters, an unbounded string, or a cyclic structure in
+the diagnostic fields. The bound is part of the library's
+[security behavior](resource-limits.md).
 
 ## Catching both condition types
 

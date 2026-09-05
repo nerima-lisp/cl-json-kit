@@ -1,8 +1,6 @@
 ;;;; src/writer-numbers.lisp
 ;;;;
-;;;; Serializing JSON numbers.  Integers print exactly; ratios print only when
-;;;; they have a terminating decimal expansion (and within the output budget);
-;;;; floats print in a form that reads back to the identical value.
+;;;; JSON number serialization.
 (in-package #:json-kit)
 
 ;;; ---------------------------------------------------------------------

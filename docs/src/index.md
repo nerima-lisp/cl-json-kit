@@ -10,8 +10,8 @@ The core reader and writer use portable Common Lisp. On SBCL,
 implementations accept the option but parse without a wall-clock timeout.
 
 Start with [Getting Started](getting-started.md), then move on to
-[Reading JSON](guide/reading.md) and [Writing JSON](guide/writing.md) for the
-full API surface.
+[Reading JSON](guide/reading.md) and [Writing JSON](guide/writing.md) for API
+details.
 
 <div class="grid cards" markdown>
 
@@ -19,7 +19,7 @@ full API surface.
 
     ---
 
-    Install with Nix or ASDF and parse your first document in minutes.
+    Install with Nix or ASDF and parse a document.
 
     [:octicons-arrow-right-24: Getting Started](getting-started.md)
 
@@ -43,7 +43,7 @@ full API surface.
 
     ---
 
-    What 1.0 promises, what it deliberately does not, and how to report a break.
+    Public API guarantees, exclusions, and compatibility reporting.
 
     [:octicons-arrow-right-24: Compatibility promise](reference/compatibility.md)
 
@@ -51,15 +51,15 @@ full API surface.
 
     ---
 
-    Reproducible SBCL harnesses with full provenance in the output.
+    Reproducible SBCL harnesses with provenance in the output.
 
     [:octicons-arrow-right-24: Benchmarks](reference/benchmarks.md)
 
 </div>
 
-## Why another JSON library?
+## JSON representation
 
-The central rule is that **JSON shape is never guessed from Lisp contents**:
+JSON shape is not inferred from Lisp contents:
 
 - A JSON object is a hash table or an alist, selected with `:object-type`.
 - A JSON array is a vector or a list, selected with `:array-type`.
@@ -67,36 +67,34 @@ The central rule is that **JSON shape is never guessed from Lisp contents**:
 - An alist becomes an object only after explicit conversion with
   [`alist->json-object`](guide/conversion.md).
 
-This avoids silently treating an array of pairs as an object — a class of
-ambiguity bug that has affected sibling JSON libraries. The reader also handles
-UTF-16 surrogate-pair escapes, rejects unpaired surrogates, reports an error
-path and source location, and applies configurable bounds before untrusted
-input can grow without limit.
+An array of pairs is not treated as an object. The reader also
+handles UTF-16 surrogate-pair escapes, rejects unpaired surrogates, reports an
+error path and source location, and applies configurable bounds to input.
 
-## Key features
+## Behavior summary
 
-- **Explicit shape control.** You decide whether objects become hash tables or
-  alists and whether arrays become vectors or lists — the library never infers
-  intent from a cons list's structure.
+- **Shape selection.** `:object-type` selects hash tables or alists, and
+  `:array-type` selects vectors or lists; the library does not infer intent
+  from a cons list's structure.
 - **Distinct `null` and `false`.** `+json-null+` and `+json-false+` are opaque
   sentinels, kept distinguishable from Lisp `nil` and from each other.
-- **Correct Unicode.** `\uXXXX` escapes decode UTF-16 surrogate pairs into a
+- **Unicode handling.** `\uXXXX` escapes decode UTF-16 surrogate pairs into a
   single non-BMP character (for example, emoji); lone surrogates are rejected.
-- **Bounded by default.** Every reader and writer entry point enforces finite
+- **Default bounds.** Every reader and writer entry point enforces finite
   [size and depth limits](reference/resource-limits.md) suited to untrusted input.
-- **Structured diagnostics.** Failures signal typed conditions carrying
+- **Diagnostics.** Failures signal typed conditions carrying
   [position, line, column, path, and a bounded snippet](reference/conditions.md).
 - **No runtime dependencies.** The runtime system depends on nothing beyond the
   Common Lisp standard; only the test system uses `cl-weave`.
-- **Measured conformance.** The full [JSONTestSuite](https://github.com/nst/JSONTestSuite)
-  parsing corpus is vendored into the test suite and runs on every build — all
-  95 must-accept cases accepted, all 188 must-reject cases rejected, and every
-  implementation-defined answer pinned. See [RFC 8259 Scope](reference/rfc-8259.md).
-- **A stable API.** From 1.0.0 on, the exported surface follows
-  [Semantic Versioning](reference/compatibility.md), and the export list itself is
-  asserted by the test suite so it cannot change by accident.
+- **RFC 8259 conformance tests.** The [JSONTestSuite](https://github.com/nst/JSONTestSuite)
+  parsing corpus is vendored into the test suite: all 95 must-accept cases are
+  accepted, all 188 must-reject cases are rejected, and implementation-defined
+  answers are covered by tests. See [RFC 8259 Scope](reference/rfc-8259.md).
+- **API stability.** From 1.0.0 on, the exported surface follows
+  [Semantic Versioning](reference/compatibility.md). The test suite checks the
+  export list.
 
-## At a glance
+## Example
 
 ```lisp
 (defparameter *document*
@@ -128,7 +126,7 @@ input can grow without limit.
 | `false` | `+json-false+` | `+json-false+` |
 | `null` | `+json-null+` | `+json-null+` |
 
-See [Data Model and Mapping](guide/data-model.md) for the full rules, including the
+See [Data Model and Mapping](guide/data-model.md) for rules including the
 treatment of `nil`, ratios, and unsupported values.
 
 ## Nix workflow

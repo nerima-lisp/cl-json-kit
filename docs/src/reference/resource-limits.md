@@ -1,8 +1,7 @@
 # Resource Limits and Security
 
-`cl-json-kit` is designed to be given **untrusted input**. Every reader and
-writer entry point enforces finite bounds by default, and the bounds are
-applied *before* untrusted input can grow without limit.
+Every reader and writer entry point enforces finite bounds by default. The
+bounds are applied *before* untrusted input can grow without limit.
 
 ## Default limits
 
@@ -103,4 +102,4 @@ threads write to the *same* stream, or read/mutate the *same* hash table or
   reach `cl-json-kit`. See [RFC 8259 Scope](rfc-8259.md).
 - **Semantic validation** (schema, required keys, value ranges) is the
   application's responsibility. `cl-json-kit` guarantees a well-formed,
-  bounded parse — not that the parsed document means what you expect.
+  bounded parse. Semantic validation remains the application's responsibility.

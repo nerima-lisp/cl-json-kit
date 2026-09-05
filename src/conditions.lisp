@@ -1,9 +1,6 @@
 ;;;; src/conditions.lisp
 ;;;;
-;;;; The structured conditions PARSE and the writer signal, plus the bounded
-;;;; diagnostic helpers that keep an error report from itself becoming an
-;;;; attack surface: every attacker-influenced string, path, or "expected"
-;;;; value is truncated and escaped before it reaches a condition slot.
+;;;; Structured parse and serialization conditions with bounded diagnostics.
 (in-package #:json-kit)
 
 (defconstant +maximum-error-snippet-length+ 256)

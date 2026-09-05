@@ -1,15 +1,6 @@
 ;;;; src/writer-macros.lisp
 ;;;;
-;;;; The writer's cross-cutting control-flow, named once here as a macro so
-;;;; the writer-* logic files read as intent ("with this path pushed", "emit
-;;;; this bracketed collection") rather than repeated let/unwind-protect
-;;;; bookkeeping.  DO-PROPER-LIST also serves CONVERSION.LISP's alist
-;;;; validation, since both walk a bounded proper list the same way.
-;;;;
-;;;; The bodies reference functions and specials defined in later files
-;;;; (SERIALIZATION-ERROR, EMIT-CHARACTER, ...); that is fine because a
-;;;; macro's expansion is only evaluated where it is *used*, and the :SERIAL
-;;;; system loads those definitions before any use site is compiled.
+;;;; Writer control-flow macros, including bounded proper-list traversal.
 (in-package #:json-kit)
 
 ;;; ---------------------------------------------------------------------
