@@ -50,7 +50,18 @@ The library itself has no external dependencies; only the test system uses
 
 `parse-prefix` returns one value plus its end index, for scanning concatenated
 values; `read-json` reads exactly one value from a character stream without
-over-consuming. See [Reading](https://nerima-lisp.github.io/cl-json-kit/guide/reading/)
+over-consuming. `parse` accepts a range with an inclusive `:start` and an
+exclusive `:end`:
+
+```lisp
+(json-kit:parse "prefix [1,2] suffix" :start 7 :end 12) ; => #(1 2)
+```
+
+`read-json-line` consumes one LF- or CRLF-terminated line and returns the parsed
+value and `t`. Before reading any characters, EOF returns `nil, nil`. A complete
+final value without a newline is accepted; empty lines, incomplete JSON, and
+multiple values on one line signal `json-parse-error`.
+See [Reading](https://nerima-lisp.github.io/cl-json-kit/guide/reading/)
 and [Writing](https://nerima-lisp.github.io/cl-json-kit/guide/writing/) for the
 option reference.
 
@@ -78,6 +89,42 @@ The value `nil` is the empty list and is written as `[]`, never as `null` or
 `false`. Rules for ratios and rejected values are in the
 [Data Model](https://nerima-lisp.github.io/cl-json-kit/guide/data-model/).
 
+## JSON Schema subset
+
+`validate-schema` accepts a decoded value and schema, using the default `parse`
+representation: string-keyed hash tables, vectors for arrays, strings, numbers,
+`t`, `+json-false+`, and `+json-null+`. Alists, list arrays, and custom sentinel
+mappings are outside this API's contract.
+
+```lisp
+(multiple-value-bind (valid-p failures)
+    (json-kit:validate-schema
+  (json-kit:parse "{\"count\":\"two\"}")
+  (json-kit:parse
+   "{\"type\":\"object\",\"required\":[\"count\"],\"properties\":{\"count\":{\"type\":\"integer\"}}}"))
+  (values valid-p (mapcar (lambda (failure) (getf failure :path)) failures)))
+;; => NIL, ("/count")
+```
+
+The result is two values: a boolean and a list of failures. Each failure is a
+plist with `:path`, a JSON Pointer into the value, and `:reason`, an explanation.
+The root pointer is the empty string; object keys escape `~` as `~0` and `/` as
+`~1`.
+
+Only `type`, `required`, `properties`, `enum`, `items`, `additionalProperties`,
+and `oneOf` are supported. `type` accepts one type name or an array of names;
+`integer` includes mathematical integers such as `1.0`. `items` applies one
+schema to every array element. `additionalProperties` defaults to true and
+accepts true, false, or a schema. `oneOf` requires exactly one matching schema.
+Boolean schemas (`true` and `false`) are also accepted.
+
+The entire schema is checked before validating the value. An unsupported
+keyword, including annotations such as `$schema`, `$id`, and `title`, or a
+malformed schema signals `json-schema-error`, a subtype of `json-kit-error`.
+No keyword is silently ignored. `json-schema-error-path` identifies the
+location in the schema, and `json-schema-error-message` explains the error.
+See [API Reference](https://nerima-lisp.github.io/cl-json-kit/reference/api/#schema-validation).
+
 ## Tested and bounded behavior
 
 - **RFC 8259 conformance tests.** The parsing corpus from
@@ -89,10 +136,10 @@ The value `nil` is the empty list and is written as `[]`, never as `null` or
   behavior follow [Semantic Versioning](https://semver.org/). The test suite
   checks the export list.
   ([what is and is not covered](https://nerima-lisp.github.io/cl-json-kit/reference/compatibility/))
-- **Default bounds.** Every entry point enforces finite input, output,
+- **Default bounds.** Reading and writing entry points enforce finite input, output,
   depth, and element limits, plus an optional wall-clock timeout on SBCL.
   ([limits](https://nerima-lisp.github.io/cl-json-kit/reference/resource-limits/))
-- **Diagnostics.** Failures signal typed conditions carrying
+- **Diagnostics.** Parse and serialization failures signal typed conditions carrying
   position, line, column, path, and a bounded, sanitized snippet.
   ([error handling](https://nerima-lisp.github.io/cl-json-kit/reference/conditions/))
 - **Unicode handling.** `\uXXXX` escapes decode UTF-16 surrogate pairs into a

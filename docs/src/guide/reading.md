@@ -1,20 +1,23 @@
 # Reading JSON
 
-`cl-json-kit` offers three reader entry points:
+`cl-json-kit` offers these reader entry points:
 
-- [`parse`](#parse) — the whole string must be one JSON value.
+- [`parse`](#parse) accepts one JSON value within a string range.
 - [`parse-prefix`](#parse-prefix) — read the first value and report where it
   ended, for scanning concatenated values.
 - [`read-json`](#read-json) — read exactly one value from a character stream.
+- [`read-json-line`](#read-json-line) reads one JSON value per line.
 
-All three share the same option set (apart from the extra `:index` accepted by
-`parse-prefix`).
+All share the parsing options below. `:start` and `:end` select a range only for
+`parse`; `:index` selects the starting position only for `parse-prefix`.
 
 ## `parse`
 
 ```lisp
 (json-kit:parse string
   &key
+    (start 0)
+    end
     (object-type :hash-table)
     (array-type :vector)
     (duplicate-key-policy :last)
@@ -36,8 +39,18 @@ All three share the same option set (apart from the extra `:index` accepted by
     timeout-seconds)
 ```
 
-`parse` requires the **entire** string, apart from trailing JSON whitespace, to
-be one JSON value. Anything else after the value is an error.
+`parse` requires the selected range, apart from JSON whitespace, to be one JSON
+value. `:start` defaults to zero and `:end` defaults to the string length. The
+end is exclusive; the bounds must satisfy `0 <= start <= end <= (length string)`.
+Anything else after the value within that range is an error. An empty range
+signals `json-parse-error`.
+
+```lisp
+(json-kit:parse "prefix [1,2] suffix" :start 7 :end 12) ; => #(1 2)
+```
+
+Error positions, lines, and columns refer to the original string.
+`:max-input-length` bounds the selected range length.
 
 ### Container shape
 
@@ -149,7 +162,8 @@ remain unconsumed. Use it to scan back-to-back values:
 ;; => (#(2) 6)
 ```
 
-Every other keyword matches `parse`.
+The parsing options match `parse`, except that `:start` and `:end` are not
+accepted.
 
 ## `read-json`
 
@@ -174,6 +188,33 @@ Every other keyword matches `parse`.
     `read-json` operates on characters. For UTF-8 files or sockets, set the
     stream's external format before calling it. There is no octet/UTF-8 API.
     See [RFC 8259 Scope](../reference/rfc-8259.md).
+
+## `read-json-line`
+
+```lisp
+(json-kit:read-json-line stream &rest parse-options)
+  => value, present-p
+```
+
+`read-json-line` consumes one line from a character input stream, including its
+LF or CRLF ending. It parses the line as exactly one JSON value. It leaves the
+next line unread and does not close the stream.
+Error positions, lines, and columns refer to the extracted line, starting at
+position zero, line one, and column one.
+
+| Input | Result |
+| --- | --- |
+| One complete JSON value with LF or CRLF | The decoded value and `t`. |
+| One complete JSON value followed by EOF | The decoded value and `t`. |
+| EOF before any characters | `nil` and `nil`. |
+| An empty or whitespace-only line | `json-parse-error`. |
+| Incomplete JSON at line end or EOF | `json-parse-error`. |
+| Two JSON values on one line | `json-parse-error`. |
+
+The second value distinguishes EOF from a JSON value decoded as `nil` by a
+custom mapping. The resource limits and callbacks apply as for `read-json`;
+the input-length limit is enforced while buffering the line. A configured
+timeout covers reading and parsing the line.
 
 ## Resource limits
 

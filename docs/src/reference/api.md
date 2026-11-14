@@ -11,7 +11,7 @@ Each entry links to the corresponding guide section with examples and details.
 ### `parse`
 
 ```lisp
-(json-kit:parse string &key object-type array-type duplicate-key-policy
+(json-kit:parse string &key start end object-type array-type duplicate-key-policy
                             null-value false-value true-value
                             key-decoder number-decoder object-hook array-hook
                             max-depth max-input-length max-string-length
@@ -21,7 +21,8 @@ Each entry links to the corresponding guide section with examples and details.
   => value
 ```
 
-Parse the whole string as exactly one JSON value, rejecting trailing data.
+Parse the range from `:start` (default zero) to exclusive `:end` (default string
+length) as exactly one JSON value, rejecting trailing data within that range.
 → [Reading JSON](../guide/reading.md#parse)
 
 ### `parse-prefix`
@@ -43,6 +44,56 @@ index. → [Reading JSON](../guide/reading.md#parse-prefix)
 
 Read exactly one JSON value from a character stream, leaving the following
 character unread. → [Reading JSON](../guide/reading.md#read-json)
+
+### `read-json-line`
+
+```lisp
+(json-kit:read-json-line stream &rest parse-options)
+  => value, present-p
+```
+
+Read one LF- or CRLF-terminated line and parse exactly one JSON value. Return
+`nil, nil` at EOF before any characters. A final complete value without a
+newline returns the value and `t`.
+→ [Reading JSON](../guide/reading.md#read-json-line)
+
+## Schema validation
+
+```lisp
+(json-kit:validate-schema value schema)
+  => valid-p, failures
+```
+
+Validate a value using the default `parse` representation: string-keyed hash
+tables, array vectors, strings, numbers, `t`, `+json-false+`, and `+json-null+`.
+Schemas use the same representation. Alists, list arrays, and custom sentinel
+mappings are outside the contract.
+
+`failures` is a list of plists with `:path`, a JSON Pointer into the value, and
+`:reason`, a string describing the mismatch. Successful validation returns
+`t, nil`. The empty pointer denotes the root, and object keys escape `~` as
+`~0` and `/` as `~1`.
+
+| Keyword | Supported form |
+| --- | --- |
+| `type` | One type name or an array of names: `null`, `boolean`, `object`, `array`, `number`, `integer`, `string`. Mathematical integers such as `1.0` satisfy `integer`. |
+| `required` | An array of property names that must exist on an object. |
+| `properties` | An object mapping property names to schemas. |
+| `enum` | An array of allowed JSON values, compared structurally. |
+| `items` | One schema applied to every array element. |
+| `additionalProperties` | True (default), false, or a schema for properties not named in `properties`. |
+| `oneOf` | An array of schemas; exactly one must match. |
+
+Boolean schemas (`t` and `+json-false+`) accept or reject every value.
+The whole schema is checked before the value is validated. Unsupported
+keywords, including `$schema`, `$id`, and `title`, and malformed schemas signal
+`json-schema-error`. No keyword is silently ignored.
+
+| Symbol | Kind | Meaning |
+| --- | --- | --- |
+| `json-schema-error` | condition | Invalid or unsupported schema; subtype of `json-kit-error`. |
+| `json-schema-error-path` | reader | JSON Pointer into the schema. |
+| `json-schema-error-message` | reader | Reason the schema cannot be used. |
 
 ## Writing
 
@@ -137,8 +188,10 @@ The defaults enforced by the entry points are:
 
 | Option | Default | Applies to |
 | --- | --- | --- |
-| `object-type` | `:hash-table` | `parse`, `parse-prefix`, `read-json` |
-| `array-type` | `:vector` | `parse`, `parse-prefix`, `read-json` |
+| `start` | `0` | `parse` |
+| `end` | `nil` (string length) | `parse` |
+| `object-type` | `:hash-table` | reading |
+| `array-type` | `:vector` | reading |
 | `duplicate-key-policy` | `:last` | reading |
 | `null-value` | `+json-null+` | reading, writing |
 | `false-value` | `+json-false+` | reading, writing |
