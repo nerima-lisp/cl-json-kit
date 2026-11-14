@@ -2,18 +2,29 @@
 (in-package #:json-kit)
 
 (define-condition json-schema-error (json-kit-error)
-  ((path :initarg :path :reader json-schema-error-path)
-   (message :initarg :message :reader json-schema-error-message))
-  (:documentation "An unsupported keyword or malformed schema, detected before validation.")
+  ((path :initarg :path :reader json-schema-error-path
+         :documentation "Bounded, escaped excerpt of the JSON Pointer into the schema.")
+   (message :initarg :message :reader json-schema-error-message
+            :documentation "Bounded, escaped explanation of the schema error."))
+  (:documentation "An unsupported keyword or malformed schema, detected before validation.
+Library-signalled conditions store PATH and MESSAGE as escaped diagnostic
+excerpts of at most 256 characters each.")
   (:report (lambda (condition stream)
-             (format stream "JSON schema error at ~S: ~A"
+             (format stream "JSON schema error at ~A: ~A"
                      (json-schema-error-path condition)
                      (json-schema-error-message condition)))))
 
 (setf (documentation 'json-schema-error-path 'function)
-      "JSON Pointer locating the unsupported keyword or malformed schema."
+      "Bounded, escaped excerpt of the schema JSON Pointer, at most 256 characters.
+This diagnostic may be truncated and is not an exact machine-readable pointer."
       (documentation 'json-schema-error-message 'function)
-      "Description of why the schema cannot be used.")
+      "Bounded, escaped explanation of the schema error, at most 256 characters.")
+(defun bounded-json-schema-error (&key path message)
+  "Construct a JSON-SCHEMA-ERROR with diagnostic slots bounded and escaped once.
+Use this constructor at library signalling sites, as for BOUNDED-JSON-PARSE-ERROR."
+  (make-condition 'json-schema-error
+                  :path (safe-diagnostic-snippet path)
+                  :message (safe-diagnostic-snippet message)))
 
 (defun schema-pointer-child (pointer token)
   (concatenate 'string pointer "/"
@@ -61,7 +72,7 @@
 
 (defun check-json-schema (schema pointer)
   (labels ((fail (path message)
-             (error 'json-schema-error :path path :message message))
+             (error (bounded-json-schema-error :path path :message message)))
            (type-name-p (value)
              (and (stringp value)
                   (member value '("null" "boolean" "object" "array" "number"
@@ -167,8 +178,7 @@
   (cond
     ((hash-table-p value)
      (unless (eq (hash-table-test value) (quote equal))
-       (error (quote json-schema-error) :path pointer
-              :message "Schema hash tables must use EQUAL"))
+       (error (bounded-json-schema-error :path pointer :message "Schema hash tables must use EQUAL")))
      (maphash (lambda (key child)
                 (check-schema-table-tests child
                                           (if (stringp key)
