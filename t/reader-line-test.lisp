@@ -64,6 +64,24 @@
     (signals json-parse-error
       (read-json-line (make-string-input-stream "12") :max-input-length 1)))
 
+  (it "discards oversized LF and CRLF lines before reading the next value"
+    (dolist (terminator (list (string #\Newline) (format nil "~C~C" #\Return #\Newline)))
+      (with-input-from-string (stream (format nil "12true~A7~A" terminator terminator))
+        (let ((condition (capture-json-parse-error
+                          (read-json-line stream :max-input-length 1))))
+          (expect (json-parse-error-position condition) :to-be 1)
+          (expect (json-parse-error-expected condition)
+                  :to-equal "input within MAX-INPUT-LENGTH"))
+        (expect (peek-char nil stream) :to-be #\7)
+        (expect (read-json-line stream :max-input-length 1) :to-be 7)
+        (expect (multiple-value-list (read-json-line stream)) :to-equal '(nil nil)))))
+
+  (it "discards oversized final lines through EOF including a zero character limit"
+    (dolist (limit '(0 1))
+      (with-input-from-string (stream "12true")
+        (signals json-parse-error (read-json-line stream :max-input-length limit))
+        (expect (multiple-value-list (read-json-line stream)) :to-equal '(nil nil)))))
+
   (it "validates line limits, timeouts, and stream direction"
     (dolist (limit '(-1 "1"))
       (signals json-parse-error
@@ -92,6 +110,21 @@
       (dolist (option '(:start :end))
         (signals json-parse-error
           (funcall reader (make-string-input-stream "1 2") option 1)))))
+
+  #+sbcl
+  (it "times out while discarding an oversized line"
+      (:tags '(:slow))
+    (let ((process (uiop:launch-program (list "sh" "-c" "printf '12true'; sleep 5; printf '\\n'")
+                                      :output :stream :error-output :stream)))
+      (unwind-protect
+           (expect (handler-case
+                       (progn (read-json-line (uiop:process-info-output process)
+                                              :max-input-length 1 :timeout-seconds 0.2)
+                              nil)
+                     (sb-ext:timeout () t))
+                   :to-be-truthy)
+        (ignore-errors (uiop:terminate-process process :urgent t))
+        (ignore-errors (uiop:wait-process process)))))
 
   #+sbcl
   (it "times out while waiting for the rest of a line"

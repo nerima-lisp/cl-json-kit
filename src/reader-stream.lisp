@@ -129,9 +129,11 @@ PARSE. Parsing options are accepted except :START and :END."
 Return the value and T, or NIL and NIL when EOF precedes any characters.
 Blank lines, incomplete values, and multiple values signal JSON-PARSE-ERROR.
 Parsing options are accepted except :START and :END. MAX-INPUT-LENGTH excludes
-the LF or CRLF terminator; TIMEOUT-SECONDS covers reading and parsing."
+the LF or CRLF terminator. An oversized line is discarded through its terminator
+or EOF before signalling. TIMEOUT-SECONDS covers reading, discarding, and parsing."
   (let ((buffer (make-array 0 :element-type 'character :adjustable t :fill-pointer 0))
         (eof (gensym "EOF"))
+        (limit-exceeded-p nil)
         (timeout-seconds (getf options :timeout-seconds)))
     (labels ((fail (expected)
                (let ((text (coerce buffer 'string)))
@@ -142,9 +144,9 @@ the LF or CRLF terminator; TIMEOUT-SECONDS covers reading and parsing."
                            :path nil :expected expected :context "stream"
                            :text text)))))
              (append-character (character)
-               (when (>= (length buffer) max-input-length)
-                 (fail "input within MAX-INPUT-LENGTH"))
-               (vector-push-extend character buffer))
+               (if (< (length buffer) max-input-length)
+                   (vector-push-extend character buffer)
+                   (setf limit-exceeded-p t)))
              (run ()
                (when (loop for key in options by #'cddr
                            thereis (member key '(:start :end)))
@@ -160,7 +162,7 @@ the LF or CRLF terminator; TIMEOUT-SECONDS covers reading and parsing."
                (loop for character = (read-char stream nil eof)
                      do (cond
                           ((eq character eof)
-                           (when (zerop (length buffer))
+                           (when (and (zerop (length buffer)) (not limit-exceeded-p))
                              (return-from run (values nil nil)))
                            (return))
                           ((char= character #\Newline) (return))
@@ -169,6 +171,8 @@ the LF or CRLF terminator; TIMEOUT-SECONDS covers reading and parsing."
                            (read-char stream)
                            (return))
                           (t (append-character character))))
+               (when limit-exceeded-p
+                 (fail "input within MAX-INPUT-LENGTH"))
                (let ((parse-options (copy-list options)))
                  (remf parse-options :timeout-seconds)
                  (values (apply #'parse (coerce buffer 'string) parse-options) t))))
