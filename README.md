@@ -92,9 +92,12 @@ The value `nil` is the empty list and is written as `[]`, never as `null` or
 ## JSON Schema subset
 
 `validate-schema` accepts a decoded value and schema, using the default `parse`
-representation: string-keyed hash tables, vectors for arrays, strings, numbers,
-`t`, `+json-false+`, and `+json-null+`. Alists, list arrays, and custom sentinel
-mappings are outside this API's contract.
+representation: hash tables using the `equal` test with string keys, vectors
+for arrays, strings, numbers, `t`, `+json-false+`, and `+json-null+`. Alists,
+list arrays, custom sentinel mappings, and hash tables using other tests are
+outside this API's contract.
+Any hash table in the schema, including within `enum` values, must use `equal`;
+another hash-table test signals `json-schema-error`.
 
 ```lisp
 (multiple-value-bind (valid-p failures)

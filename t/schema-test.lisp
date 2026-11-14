@@ -168,4 +168,16 @@
       (setf (aref value 10) "bad")
       (multiple-value-bind (valid errors) (validate-schema value schema)
         (expect valid :to-be-falsy)
-        (expect (getf (first errors) :path) :to-equal "/10")))))
+        (expect (getf (first errors) :path) :to-equal "/10"))))
+  (it "rejects non-EQUAL hash tables anywhere in the schema tree"
+    (let ((bad (make-hash-table)))
+      (setf (gethash (copy-seq "type") bad) "integer")
+      (dolist (schema (list bad
+                            (let ((parent (parse "{\"properties\":{}}")))
+                              (setf (gethash "properties" parent) bad) parent)
+                            (let ((parent (parse "{\"properties\":{}}")))
+                              (setf (gethash "unused" (gethash "properties" parent)) bad) parent)
+                            (let ((parent (parse "{\"enum\":[]}")))
+                              (setf (gethash "enum" parent) (vector bad)) parent)))
+        (signals json-schema-error (validate-schema (parse "null") schema))))
+    (expect (validate-json-text "1" "{\"type\":\"integer\"}") :to-be-truthy)))

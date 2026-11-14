@@ -163,12 +163,28 @@
                (unless (= matches 1)
                  (fail pointer (format nil "oneOf matched ~D schemas; expected exactly one" matches))))))))
       (nreverse errors))))
+(defun check-schema-table-tests (value pointer)
+  (cond
+    ((hash-table-p value)
+     (unless (eq (hash-table-test value) (quote equal))
+       (error (quote json-schema-error) :path pointer
+              :message "Schema hash tables must use EQUAL"))
+     (maphash (lambda (key child)
+                (check-schema-table-tests child
+                                          (if (stringp key)
+                                              (schema-pointer-child pointer key)
+                                              pointer)))
+              value))
+    ((schema-array-p value)
+     (loop for child across value for index from 0
+           do (check-schema-table-tests child (schema-pointer-child pointer index))))))
 
 (defun validate-schema (value schema)
   "Validate VALUE against the supported JSON Schema subset. Return a boolean and
 a list of (:PATH JSON-Pointer :REASON string) failures. Both arguments use the
 default PARSE representation. Unsupported keywords and malformed schemas signal
 JSON-SCHEMA-ERROR before any instance validation, including in unused branches."
+  (check-schema-table-tests schema "")
   (check-json-schema schema "")
   (let ((errors (if (schema-json-value-p value)
                     (schema-validation-errors value schema "")
