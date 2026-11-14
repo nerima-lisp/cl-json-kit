@@ -20,7 +20,7 @@
     :max-depth :max-input-length :max-string-length :max-number-length
     :max-exact-exponent :max-array-elements :max-object-members
     :context :timeout-seconds)
-  "Every keyword PARSE accepts.")
+  "Parsing options shared by PARSE, PARSE-PREFIX, and stream readers.")
 
 (defparameter +parse-prefix-keywords+ (cons :index +parse-keywords+)
   "PARSE-PREFIX additionally accepts :INDEX to choose the start position.")

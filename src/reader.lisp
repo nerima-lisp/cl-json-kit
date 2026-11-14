@@ -31,7 +31,7 @@ function, or report a bad designator as a parse error."
                          (format nil "~A function designator" name))))
 
 (defun %parse-prefix (string index
-                      &key
+                      &key end (limit-start 0)
                         (object-type :hash-table) (array-type :vector)
                         (duplicate-key-policy :last)
                         (null-value +json-null+) (false-value +json-false+)
@@ -44,7 +44,8 @@ function, or report a bad designator as a parse error."
   "Parse one JSON value at INDEX and return the value and its exclusive end
 index.  Validates every option before touching the input."
   (check-type string string)
-  (let ((length (length string)))
+  (let* ((length (length string))
+         (end (or end length)))
     (macrolet ((require-option (test expected)
                  ;; Signal a located option error unless TEST holds; STRING,
                  ;; INDEX and CONTEXT come from the enclosing %PARSE-PREFIX.
@@ -53,6 +54,8 @@ index.  Validates every option before touching the input."
         (parser-option-error string
                              (if (integerp index) (min length (max 0 index)) 0)
                              context "INDEX between zero and the input length"))
+      (require-option (and (integerp end) (<= index end length))
+                      "END between START and the input length")
       (require-option (member object-type +object-types+)
                       "OBJECT-TYPE :HASH-TABLE or :ALIST")
       (require-option (member array-type +array-types+)
@@ -67,12 +70,12 @@ index.  Validates every option before touching the input."
                            max-array-elements max-object-members))
         (require-option (and (integerp limit) (not (minusp limit)))
                         "non-negative integer resource limits")))
-    (when (> length max-input-length)
-      (parser-option-error string max-input-length context "input within MAX-INPUT-LENGTH"))
+    (when (> (- end limit-start) max-input-length)
+      (parser-option-error string (+ limit-start max-input-length) context "input within MAX-INPUT-LENGTH"))
     (validate-timeout-seconds timeout-seconds context string)
     (let ((state
             (make-parser-state
-             :text (coerce string 'simple-string) :length length :pos index
+             :text (coerce string 'simple-string) :length end :pos index
              :object-type object-type :array-type array-type
              :duplicate-key-policy duplicate-key-policy
              :null-value null-value :false-value false-value :true-value true-value
@@ -94,7 +97,7 @@ index.  Validates every option before touching the input."
           (values value (ps-pos state)))))))
 
 (defun parse (string
-              &key
+              &key (start 0) end
                 (object-type :hash-table) (array-type :vector)
                 (duplicate-key-policy :last)
                 (null-value +json-null+) (false-value +json-false+) (true-value t)
@@ -103,11 +106,15 @@ index.  Validates every option before touching the input."
                 (max-string-length 1048576) (max-number-length 1024)
                 (max-exact-exponent 10000) (max-array-elements 1000000)
                 (max-object-members 1000000) (context "json") timeout-seconds)
-  "Parse STRING as exactly one complete JSON text, rejecting trailing data."
+  "Parse STRING from START (inclusive) to END (exclusive) as one JSON value.
+END defaults to the string length. Error positions refer to the original
+STRING, and MAX-INPUT-LENGTH bounds the selected range."
+  (check-type string string)
   (multiple-value-bind (value end-index)
-      (call-with-forwarded-parse-keywords #'%parse-prefix string 0)
+      (call-with-forwarded-parse-keywords #'%parse-prefix string start
+                                          :end end :limit-start start)
     (let ((position end-index)
-          (length (length string)))
+          (length (or end (length string))))
       (loop while (and (< position length)
                        (whitespace-char-p (char string position)))
             do (incf position))
@@ -117,8 +124,8 @@ index.  Validates every option before touching the input."
 
 (defun parse-prefix (string &rest arguments)
   "Parse one JSON value from STRING and return it plus its exclusive end index.
-The parse start defaults to zero; pass :INDEX to begin elsewhere.  All other
-keywords match PARSE."
+The parse start defaults to zero; pass :INDEX to begin elsewhere. Parsing
+options match PARSE except that :START and :END are not accepted."
   (when (oddp (length arguments))
     (parser-option-error string 0 :options "keyword arguments in key/value pairs"))
   (loop for tail on arguments by #'cddr

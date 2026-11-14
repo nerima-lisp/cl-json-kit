@@ -68,6 +68,7 @@ correctly, and parsing can be bounded with a timeout."
                (:file "reader-callbacks-test")
                (:file "reader-streaming-test")
                (:file "reader-line-test")
+               (:file "reader-range-test")
                (:file "writer-numbers-test")
                (:file "writer-collections-test")
                (:file "writer-strings-test")
