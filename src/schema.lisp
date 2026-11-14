@@ -168,11 +168,22 @@ Use this constructor at library signalling sites, as for BOUNDED-JSON-PARSE-ERRO
                      do (validate-child child items (schema-pointer-child pointer index))))))
          (multiple-value-bind (alternatives present-p) (gethash "oneOf" schema)
            (when present-p
-             (let ((matches (count-if (lambda (alternative)
-                                        (null (schema-validation-errors value alternative pointer)))
-                                      alternatives)))
-               (unless (= matches 1)
-                 (fail pointer (format nil "oneOf matched ~D schemas; expected exactly one" matches))))))))
+             (let* ((results (loop for alternative across alternatives
+                                   collect (schema-validation-errors value alternative pointer)))
+                    (matches (loop for failures in results for index from 0
+                                   unless failures collect index)))
+               (unless (= (length matches) 1)
+                 (fail pointer
+                       (with-output-to-string (stream)
+                         (format stream "oneOf matched ~D schemas; expected exactly one" (length matches))
+                         (if matches
+                             (format stream "; matched indices: ~{~D~^, ~}" matches)
+                             (loop for failures in results for index from 0
+                                   do (format stream "; branch ~D" index)
+                                      (dolist (failure failures)
+                                        (format stream " [path ~S: ~A]"
+                                                (getf failure :path)
+                                                (getf failure :reason)))))))))))))
       (nreverse errors))))
 (defun check-schema-table-tests (value pointer)
   (cond

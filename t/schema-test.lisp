@@ -141,7 +141,7 @@
     #+sbcl
     (expect (validate-schema sb-ext:double-float-positive-infinity (parse "{}")) :to-be-falsy))
 
-  (it "validates the D70 envelope shape and error code enumeration"
+  (it "validates an envelope with required fields and enumerated error codes"
     (let* ((schema (parse "{\"type\":\"object\",\"required\":[\"nshell_api\",\"ok\",\"status\",\"duration_ms\",\"stdout\",\"stderr\",\"effects\",\"safety\",\"state\"],\"additionalProperties\":true,\"properties\":{\"nshell_api\":{\"type\":\"string\"},\"ok\":{\"type\":\"boolean\"},\"status\":{\"type\":\"integer\"},\"duration_ms\":{\"type\":\"number\"},\"stdout\":{\"type\":\"string\"},\"stderr\":{\"type\":\"string\"},\"effects\":{\"type\":\"array\",\"items\":{\"type\":\"object\"}},\"safety\":{\"type\":\"object\"},\"state\":{\"type\":\"object\"},\"error\":{\"type\":\"object\",\"required\":[\"code\"],\"properties\":{\"code\":{\"enum\":[\"invalid_argument\",\"internal_error\"]}}}}}"))
            (value (parse "{\"nshell_api\":\"0.8\",\"ok\":false,\"status\":1,\"duration_ms\":0.5,\"stdout\":\"\",\"stderr\":\"bad\",\"effects\":[],\"safety\":{},\"state\":{},\"optional\":true,\"error\":{\"code\":\"invalid_argument\"}}")))
       (expect (multiple-value-list (validate-schema value schema)) :to-equal '(t nil))
@@ -221,4 +221,40 @@
         (setf (gethash "required" schema) (vector key))
         (multiple-value-bind (valid errors) (validate-schema (parse "{}") schema)
           (expect valid :to-be-falsy)
-          (expect (getf (first errors) :path) :to-equal (concatenate 'string "/" key)))))))
+          (expect (getf (first errors) :path) :to-equal (concatenate 'string "/" key))))))
+  (it "explains every failed oneOf branch including nested validation failures"
+    (multiple-value-bind (valid errors)
+        (validate-json-text
+         "{\"result\":{\"detail\":true}}"
+         "{\"properties\":{\"result\":{\"oneOf\":[{\"required\":[\"left\"],\"properties\":{\"detail\":{\"oneOf\":[{\"type\":\"integer\"},{\"type\":\"string\"}]}}},{\"required\":[\"other\"]}]}}}")
+      (expect valid :to-be-falsy)
+      (expect (length errors) :to-equal 1)
+      (expect (getf (first errors) :path) :to-equal "/result")
+      (let ((reason (getf (first errors) :reason)))
+        (dolist (fragment '("oneOf matched 0 schemas" "branch 0" "branch 1"
+                            "path \"/result/left\"" "path \"/result/detail\""
+                            "path \"/result/other\"" "Required property is missing"
+                            "Value does not match the allowed type"))
+          (expect (search fragment reason) :to-be-truthy)))))
+  (it "lists matching oneOf indices in decimal under printer bindings"
+    (let ((alternatives (make-array 11 :initial-element +json-false+))
+          (schema (parse "{\"properties\":{\"result\":{\"oneOf\":[]}}}"))
+          (value (parse "{\"result\":1}"))
+          (*print-base* 16)
+          (*print-radix* t))
+      (setf (aref alternatives 0) t
+            (aref alternatives 10) t
+            (gethash "oneOf" (gethash "result" (gethash "properties" schema))) alternatives)
+      (multiple-value-bind (valid errors) (validate-schema value schema)
+        (expect valid :to-be-falsy)
+        (expect (length errors) :to-equal 1)
+        (expect (getf (first errors) :path) :to-equal "/result")
+        (expect (getf (first errors) :reason)
+                :to-equal "oneOf matched 2 schemas; expected exactly one; matched indices: 0, 10"))
+      (setf (aref alternatives 0) +json-false+
+            (aref alternatives 10) +json-false+)
+      (multiple-value-bind (valid errors) (validate-schema value schema)
+        (expect valid :to-be-falsy)
+        (expect (search "branch 10 [path \"/result\": Rejected by false schema]"
+                        (getf (first errors) :reason))
+                :to-be-truthy)))))
