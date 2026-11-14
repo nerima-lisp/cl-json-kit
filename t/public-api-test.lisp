@@ -22,7 +22,10 @@
     "JSON-SERIALIZATION-ERROR-MESSAGE" "JSON-SERIALIZATION-ERROR-PATH"
     ;; Explicit alist <-> ordered-object bridges
     "MAKE-JSON-OBJECT" "JSON-OBJECT-P" "JSON-OBJECT-MEMBERS"
-    "ALIST->JSON-OBJECT" "JSON-OBJECT->ALIST")
+    "ALIST->JSON-OBJECT" "JSON-OBJECT->ALIST"
+    ;; Schema validation
+    "VALIDATE-SCHEMA" "JSON-SCHEMA-ERROR"
+    "JSON-SCHEMA-ERROR-PATH" "JSON-SCHEMA-ERROR-MESSAGE")
   "Every symbol the JSON-KIT package exports, as of the 1.0 compatibility
 promise in docs/src/reference/compatibility.md.")
 

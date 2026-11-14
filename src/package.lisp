@@ -36,4 +36,9 @@
    #:json-object-p
    #:json-object-members
    #:alist->json-object
-   #:json-object->alist))
+   #:json-object->alist
+   ;; Schema validation
+   #:validate-schema
+   #:json-schema-error
+   #:json-schema-error-path
+   #:json-schema-error-message))

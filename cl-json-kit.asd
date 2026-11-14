@@ -40,7 +40,8 @@ correctly, and parsing can be bounded with a timeout."
                (:file "writer-numbers")
                (:file "writer-collections")
                (:file "writer")
-               (:file "conversion"))
+               (:file "conversion")
+               (:file "schema"))
   :in-order-to ((test-op (test-op "cl-json-kit/test"))))
 
 (asdf:defsystem "cl-json-kit/test"
@@ -74,7 +75,8 @@ correctly, and parsing can be bounded with a timeout."
                (:file "writer-streams-test")
                (:file "writer-alist-test")
                (:file "property-test")
-               (:file "rfc8259-conformance-test"))
+               (:file "rfc8259-conformance-test")
+               (:file "schema-test"))
   :perform (test-op (operation component)
              (declare (ignore operation component))
              (unless (funcall (symbol-function (find-symbol "RUN-TESTS" "CL-JSON-KIT/TEST")))
