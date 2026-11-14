@@ -8,6 +8,7 @@
    #:parse
    #:parse-prefix
    #:read-json
+   #:read-json-line
    ;; Writing
    #:write-json
    #:stringify

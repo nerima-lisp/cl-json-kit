@@ -5,7 +5,7 @@
 
 (defparameter +public-api+
   '(;; Reading
-    "PARSE" "PARSE-PREFIX" "READ-JSON"
+    "PARSE" "PARSE-PREFIX" "READ-JSON" "READ-JSON-LINE"
     ;; Writing
     "WRITE-JSON" "STRINGIFY"
     ;; Opaque JSON null / false
