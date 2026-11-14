@@ -78,23 +78,50 @@ circular aggregates, raw surrogate code points, non-string object keys, and
 exceeding `:max-output-length`, `:max-depth`, or `:max-elements`. See
 [Data Model and Mapping](../guide/data-model.md#unsupported-writer-inputs).
 
+## Schema errors and validation failures
+
+An unsupported keyword or malformed schema signals `json-schema-error` before
+instance validation, including when the defect is in an unused branch.
+
+| Reader | Meaning |
+| --- | --- |
+| `json-schema-error-path` | A bounded, escaped rendering of the JSON Pointer into the schema. |
+| `json-schema-error-message` | A bounded explanation of why the schema cannot be used. |
+
+Both fields escape control characters and are capped at 256 characters before
+they are stored in the condition. A long path may be truncated, so its reader
+provides diagnostic text rather than a pointer suitable for traversal.
+
+When the schema is valid but a value fails it, `validate-schema` returns `nil`
+and a list of failure plists; it does not signal `json-schema-error`. Each plist
+has `:path`, an exact JSON Pointer into the value, and `:reason`, a description.
+The empty string denotes the root. These returned fields are not subject to
+condition diagnostic truncation or control-character escaping.
+
+For a `oneOf` mismatch with no matching branches, the reason includes each
+branch's index and its child failure paths and reasons. When multiple branches
+match, the reason lists the matching branch indices. Branch indices start at
+zero; these details are part of the reason text, not additional failure plists.
+
 ## Bounded diagnostics as a security property
 
 Every attacker-influenced string, path component, and expected-value
 description is **truncated and escaped exactly once**, at condition
 construction, before it reaches a condition slot. Control characters are
-escaped, snippets are capped (256 characters for text, shorter for paths and
-expected values), and paths are limited in length and made cycle-safe.
+escaped, snippets are capped (256 characters for text and each Schema error
+field, shorter for parse paths and expected values), and parse and serialization
+paths are limited in length and made cycle-safe.
 
 Callers can log or surface a `json-parse-error`; crafted input cannot place
 unescaped control characters, an unbounded string, or a cyclic structure in
 the diagnostic fields. The bound is part of the library's
 [security behavior](resource-limits.md).
 
-## Catching both condition types
+## Catching specific condition types
 
-Both conditions are subtypes of `error`, so ordinary `handler-case` /
-`handler-bind` clauses apply. To treat any JSON failure uniformly:
+All three conditions are subtypes of `error`, so ordinary `handler-case` /
+`handler-bind` clauses apply. Handle each failure separately when it needs a
+different response:
 
 ```lisp
 (handler-case
@@ -102,15 +129,17 @@ Both conditions are subtypes of `error`, so ordinary `handler-case` /
   (json-kit:json-parse-error (c)
     (report-bad-input c))
   (json-kit:json-serialization-error (c)
-    (report-bad-output c)))
+    (report-bad-output c))
+  (json-kit:json-schema-error (c)
+    (report-bad-schema c)))
 ```
 
 ## The shared base condition
 
-`json-parse-error` and `json-serialization-error` both derive from
+`json-parse-error`, `json-serialization-error`, and `json-schema-error` derive from
 `json-kit-error`, the base of every condition this library signals. Catch it
 when you want to react to any failure from `cl-json-kit` without
-distinguishing parse from serialization failures:
+distinguishing parse, serialization, and schema failures:
 
 ```lisp
 (handler-case

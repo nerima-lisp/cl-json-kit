@@ -64,10 +64,13 @@ newline returns the value and `t`.
   => valid-p, failures
 ```
 
-Validate a value using the default `parse` representation: string-keyed hash
-tables, array vectors, strings, numbers, `t`, `+json-false+`, and `+json-null+`.
-Schemas use the same representation. Alists, list arrays, and custom sentinel
-mappings are outside the contract.
+Validate a value using the default `parse` representation: hash tables using
+the `equal` test with string keys, array vectors, strings, numbers, `t`,
+`+json-false+`, and `+json-null+`. Schemas use the same representation. Alists,
+list arrays, custom sentinel mappings, and hash tables using other tests are
+outside the contract.
+Every hash table in the schema, including in `enum` values, must use `equal`;
+otherwise validation signals `json-schema-error`.
 
 `failures` is a list of plists with `:path`, a JSON Pointer into the value, and
 `:reason`, a string describing the mismatch. Successful validation returns
@@ -92,8 +95,11 @@ keywords, including `$schema`, `$id`, and `title`, and malformed schemas signal
 | Symbol | Kind | Meaning |
 | --- | --- | --- |
 | `json-schema-error` | condition | Invalid or unsupported schema; subtype of `json-kit-error`. |
-| `json-schema-error-path` | reader | JSON Pointer into the schema. |
-| `json-schema-error-message` | reader | Reason the schema cannot be used. |
+| `json-schema-error-path` | reader | Bounded, escaped rendering of the JSON Pointer into the schema. |
+| `json-schema-error-message` | reader | Bounded, escaped reason the schema cannot be used. |
+
+See [Schema errors and validation failures](conditions.md#schema-errors-and-validation-failures)
+for the diagnostic bounds and `oneOf` failure details.
 
 ## Writing
 

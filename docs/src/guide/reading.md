@@ -199,6 +199,7 @@ accepted.
 `read-json-line` consumes one line from a character input stream, including its
 LF or CRLF ending. It parses the line as exactly one JSON value. It leaves the
 next line unread and does not close the stream.
+A lone CR is JSON whitespace within the line, not a line terminator.
 Error positions, lines, and columns refer to the extracted line, starting at
 position zero, line one, and column one.
 
@@ -213,8 +214,9 @@ position zero, line one, and column one.
 
 The second value distinguishes EOF from a JSON value decoded as `nil` by a
 custom mapping. The resource limits and callbacks apply as for `read-json`;
-the input-length limit is enforced while buffering the line. A configured
-timeout covers reading and parsing the line.
+the input-length limit excludes the LF or CRLF terminator. An oversized line
+is discarded through its terminator or EOF before signalling `json-parse-error`.
+A configured timeout covers reading, discarding, and parsing the line.
 
 ## Resource limits
 

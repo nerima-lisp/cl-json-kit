@@ -10,8 +10,10 @@ Everything the `json-kit` package exports, and the documented behavior of each:
 
 - **the package name `json-kit` itself**, with no nicknames, so `json-kit:parse`
   keeps resolving;
-- **the exported symbols** — the reading entry points (`parse`, `parse-prefix`,
-  `read-json`), the writing entry points (`stringify`, `write-json`), the
+- **the exported symbols**, including the reading entry points (`parse`, `parse-prefix`,
+  `read-json`, `read-json-line`), the writing entry points (`stringify`, `write-json`),
+  Schema validation (`validate-schema`, `json-schema-error`,
+  `json-schema-error-path`, `json-schema-error-message`), the
   sentinels and their predicates (`+json-null+`, `+json-false+`, `json-null-p`,
   `json-false-p`), the condition types and every slot reader, and the ordered
   object bridges (`make-json-object`, `json-object-p`, `json-object-members`,
@@ -22,7 +24,9 @@ Everything the `json-kit` package exports, and the documented behavior of each:
   type parses to and which JSON type each Lisp type serializes to;
 - **the condition type signalled for each class of failure**: malformed input
   and invalid option values signal `json-parse-error`, unserializable values and
-  exceeded output bounds signal `json-serialization-error`;
+  exceeded output bounds signal `json-serialization-error`; malformed or
+  unsupported schemas signal `json-schema-error`. A value that fails a valid
+  schema returns validation failures as the second value from `validate-schema`;
 - **the [RFC 8259 conformance](rfc-8259.md) results**, which are enforced by the
   vendored JSONTestSuite corpus in the test suite.
 

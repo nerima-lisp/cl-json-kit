@@ -75,7 +75,7 @@ nix develop --command sbcl --noinform --disable-debugger \
 
 ## Source layout
 
-The reader and writer are split into small, per-concern files, loaded serially
+The library is split into files by concern, loaded serially
 by [`cl-json-kit.asd`](https://github.com/nerima-lisp/cl-json-kit/blob/main/cl-json-kit.asd):
 
 | Area | Files |
@@ -86,6 +86,7 @@ by [`cl-json-kit.asd`](https://github.com/nerima-lisp/cl-json-kit/blob/main/cl-j
 | Reader | `src/parser-state.lisp`, `src/reader-strings.lisp`, `src/reader-numbers.lisp`, `src/reader-collections.lisp`, `src/reader.lisp`, `src/reader-stream.lisp` |
 | Writer | `src/writer-state.lisp`, `src/writer-numbers.lisp`, `src/writer-strings.lisp`, `src/writer-collections.lisp`, `src/writer.lisp` |
 | Conversion | `src/conversion.lisp` |
+| Schema validation and schema diagnostics | `src/schema.lisp` |
 
 The single public package `json-kit` is defined in `src/package.lisp`; only the
 symbols listed there are part of the supported API. See the

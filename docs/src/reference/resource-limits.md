@@ -7,7 +7,7 @@ bounds are applied *before* untrusted input can grow without limit.
 
 | Operation | Limit | Default | Unit / scope |
 | --- | --- | ---: | --- |
-| read | `max-input-length` | 16 Mi | characters in the complete input |
+| read | `max-input-length` | 16 Mi | characters, scoped by entry point below |
 | read | `max-string-length` | 1 Mi | decoded characters in one string |
 | read | `max-number-length` | 1024 | characters in one number token |
 | read | `max-exact-exponent` | 10,000 | absolute decimal scale used by exact numeric fallback |
@@ -18,6 +18,19 @@ bounds are applied *before* untrusted input can grow without limit.
 | write | `max-output-length` | 16 Mi | emitted characters |
 
 *Mi = mebi (2²⁰).*
+
+### Input length by entry point
+
+| Entry point | What `max-input-length` counts |
+| --- | --- |
+| `parse` | Characters from inclusive `:start` to exclusive `:end`; the default range is the whole string. |
+| `parse-prefix` | Characters in the whole supplied string, including characters before `:index` and after the parsed value. |
+| `read-json` | Buffered characters: leading whitespace and one JSON value, excluding following whitespace and values. |
+| `read-json-line` | Characters in one line, including whitespace but excluding its LF or CRLF terminator. |
+
+An oversized line is discarded through its terminator or EOF before
+`read-json-line` signals `json-parse-error`, so a later call starts at the next
+line. A configured timeout also covers this discard.
 
 ## Boundary semantics
 
@@ -84,8 +97,8 @@ unbounded or control-character-laden payload. See
 
 ## Thread safety
 
-The reader keeps no global mutable state: each `parse` / `parse-prefix` /
-`read-json` call works through its own freshly allocated parser state. The
+The reader keeps no global mutable state: each `parse`, `parse-prefix`,
+`read-json`, or `read-json-line` call uses its own parser state. The
 writer's configuration lives in dynamic (`defvar`) special variables, but
 `write-json` and `stringify` `let`-bind every one of them fresh on every call,
 so concurrent calls on separate threads never see each other's bindings.
@@ -100,6 +113,9 @@ threads write to the *same* stream, or read/mutate the *same* hash table or
 - **Encoding attacks** belong to the stream / external-format layer. The API
   operates on characters, not octets; validate and decode bytes before they
   reach `cl-json-kit`. See [RFC 8259 Scope](rfc-8259.md).
-- **Semantic validation** (schema, required keys, value ranges) is the
-  application's responsibility. `cl-json-kit` guarantees a well-formed,
-  bounded parse. Semantic validation remains the application's responsibility.
+- **Application constraints.** Parsing checks JSON syntax and the configured
+  resource limits. Applications can call [`validate-schema`](api.md#schema-validation)
+  to check the supported Schema subset, including required properties and
+  allowed values. Applications choose the schema and enforce constraints
+  outside that subset, such as numeric ranges and relationships between fields.
+  Parsing does not run Schema validation automatically.
